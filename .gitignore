@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+dist/
+build/
+.open-next/
+.turbo/
+
+# Generated service worker (Serwist)
+apps/web/public/sw.js
+
+# Cloudflare
+.wrangler/
+.dev.vars
+*.local
+
+# Test / coverage
+coverage/
+test-results/
+
+# Env files
+.env
+.env.*
+!.env.example
+!.dev.vars.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# TS
+*.tsbuildinfo

@@ -1,0 +1,1 @@
+export { smsProvider } from './email';

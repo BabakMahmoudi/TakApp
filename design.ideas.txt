@@ -1,0 +1,26 @@
+We develop TakApp, this is essentially a non-custodial wallet fo Stellar block chain. We create a new
+token on Stellar. We will call it TAK.
+TakApp will be an easy to use wallet that users will use to pay for coffee in selected local coffee shops. 
+They pay TAK token to get coffee. TakApp will use following design ideas/decisions:
+1. TakApp will be a Progressive App (PWA). 
+2. TakApp will be hosted on CloudFlare as a Worker.
+3. We will use sqllite as database (CloudFlare D1).
+4. We will use TypeScript, NextJs with tRPC. We use pnpm.
+5. Drizzle as ORM.
+6. The very first concern is about authentication and secret keys, here we think:
+    * Users will Sign Up with simple user name and passwords.
+    * User name will eighter be email or phone number.
+    * We create a secret key that will be used to create the Stellar Account. The key will be
+      encrypted and stored in browser sorage.
+    * We give users a 12 word key phrase to be used for recovery.
+    * We will use SEP-10 for authentication
+    * Users may get Verified. Only verified users can enjoy free gifts, the verification methods are:
+        a. Email Verification 
+        b. SMS verification.
+        c. Google authenticator
+7. The wallet should allow support XLM and TAK tokens (TAK trustline should be stablished.)
+8. TAK tokens will be essentially used to buy coffee in selected coffeshops, therefore admin should be able to 
+   edit coffeshops, also some users will be coffeshop owners.
+
+
+

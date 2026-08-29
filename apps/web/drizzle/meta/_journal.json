@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787968741178,
+      "tag": "0000_perpetual_tattoo",
+      "breakpoints": true
+    }
+  ]
+}
