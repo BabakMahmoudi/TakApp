@@ -1,4 +1,4 @@
-import { Keypair, WebAuth } from '@stellar/stellar-sdk';
+import { Keypair, WebAuth } from '@stellar/stellar-sdk/no-axios';
 
 export interface ChallengeParams {
   serverSecret: string;

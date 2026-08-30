@@ -1,7 +1,8 @@
 import { Keypair } from '@stellar/stellar-sdk';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { submitCreateAccount, type FundingServer } from '../src/server/stellar/funding';
 
+const HORIZON_URL = 'https://horizon-testnet.stellar.org';
 const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
 
 interface FakeAccount {
@@ -21,52 +22,84 @@ function fakeFundingAccount(publicKey: string): FakeAccount {
   };
 }
 
+function fakeServer(funding: Keypair): FundingServer {
+  return {
+    async loadAccount(publicKey: string) {
+      expect(publicKey).toBe(funding.publicKey());
+      return fakeFundingAccount(funding.publicKey());
+    },
+  } as unknown as FundingServer;
+}
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('account funding', () => {
   it('submits a createAccount transaction for the destination', async () => {
     const funding = Keypair.random();
     const destination = Keypair.random();
-    let submitted = false;
-    const fakeServer = {
-      async loadAccount(publicKey: string) {
-        expect(publicKey).toBe(funding.publicKey());
-        return fakeFundingAccount(funding.publicKey());
-      },
-      async submitTransaction(tx: unknown) {
-        submitted = true;
-        expect((tx as { _operations: { destination: string }[] })._operations?.[0]?.destination).toBe(
-          destination.publicKey(),
-        );
-        return { hash: 'fake-hash' };
-      },
-    } as unknown as FundingServer;
-    const result = await submitCreateAccount(fakeServer, {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ hash: 'fake-hash' }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await submitCreateAccount(fakeServer(funding), {
       networkPassphrase: NETWORK_PASSPHRASE,
       fundingSecret: funding.secret(),
       destination: destination.publicKey(),
+      horizonUrl: HORIZON_URL,
     });
-    expect(submitted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${HORIZON_URL}/transactions`,
+      expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }),
+    );
     expect(result).toEqual({ hash: 'fake-hash' });
   });
 
-  it('fails when the funding account has insufficient balance', async () => {
+  it('throws the Horizon error body when the network rejects the transaction', async () => {
     const funding = Keypair.random();
     const destination = Keypair.random();
-    const fakeServer = {
-      async loadAccount() {
-        return fakeFundingAccount(funding.publicKey());
-      },
-      async submitTransaction() {
-        throw new Error(
-          'tx_failed: op_underfunded: Insufficient balance to fund account with this amount',
-        );
-      },
-    } as unknown as FundingServer;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            type: 'https://stellar.org/horizon-errors/transaction_failed',
+            title: 'Transaction Failed',
+            status: 400,
+            detail: 'The transaction failed when submitted to the network.',
+            extras: { result_codes: { transaction: 'tx_failed', operations: ['op_underfunded'] } },
+          },
+          400,
+        ),
+      ),
+    );
     await expect(
-      submitCreateAccount(fakeServer, {
+      submitCreateAccount(fakeServer(funding), {
         networkPassphrase: NETWORK_PASSPHRASE,
         fundingSecret: funding.secret(),
         destination: destination.publicKey(),
+        horizonUrl: HORIZON_URL,
       }),
-    ).rejects.toThrow(/underfunded/);
+    ).rejects.toThrow(/op_underfunded/);
+  });
+
+  it('fails fast when Horizon is unreachable', async () => {
+    const funding = Keypair.random();
+    const destination = Keypair.random();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED horizon')));
+    await expect(
+      submitCreateAccount(fakeServer(funding), {
+        networkPassphrase: NETWORK_PASSPHRASE,
+        fundingSecret: funding.secret(),
+        destination: destination.publicKey(),
+        horizonUrl: HORIZON_URL,
+      }),
+    ).rejects.toThrow(/ECONNREFUSED horizon/);
   });
 });

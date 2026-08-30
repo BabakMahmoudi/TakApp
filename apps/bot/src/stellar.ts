@@ -1,4 +1,4 @@
-import { Horizon } from '@stellar/stellar-sdk';
+import { Horizon } from '@stellar/stellar-sdk/no-axios';
 import { stroopsFromLumens } from '@takapp/shared/money';
 import type { BotEnv } from './env';
 

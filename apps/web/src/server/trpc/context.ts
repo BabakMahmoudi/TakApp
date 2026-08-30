@@ -7,9 +7,10 @@ export interface TrpcContext {
   db: ReturnType<typeof drizzle<typeof schema>>;
   env: WorkerEnv;
   req: Request;
+  reqId: string;
 }
 
-export function createContext(opts: FetchCreateContextFnOptions, env: WorkerEnv): TrpcContext {
+export function createContext(opts: FetchCreateContextFnOptions, env: WorkerEnv, reqId: string): TrpcContext {
   const db = drizzle(env.DB, { schema });
-  return { db, env, req: opts.req };
+  return { db, env, req: opts.req, reqId };
 }

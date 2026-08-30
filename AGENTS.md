@@ -39,7 +39,7 @@ This file guides AI agents and human contributors working in this repository. Re
 
 ```bash
 pnpm install          # install dependencies
-pnpm build            # production build (once before the first pnpm dev)
+pnpm build            # production build (once before the first pnpm dev; re-run after server code changes)
 pnpm dev              # preview the web worker locally (OpenNext + wrangler, D1 local)
 pnpm dev:bot          # start the Telegram bot webhook listener locally
 pnpm typecheck        # TypeScript type checking
@@ -49,6 +49,9 @@ pnpm db:generate      # generate Drizzle migrations
 pnpm db:migrate       # apply Drizzle migrations to local D1
 pnpm deploy           # deploy the workers to Cloudflare
 ```
+
+> `opennextjs-cloudflare preview` serves the last `.open-next` build and does **not** rebuild after server code changes. If you edit `src/server/**` and `pnpm dev` seems to ignore it, run `pnpm build` first. The built worker also surfaces every signup step via `[signup]`/`[funding]`/`[trpc]` log markers; call `/api/trpc/auth.diagnostics` to probe Horizon and D1 reachability from inside the worker.
+
 
 ## Code Conventions
 
@@ -89,7 +92,7 @@ packages/
 - **Funding account (bounded zero-key exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It is used only to fund new accounts (`createAccount`) and issue TAK. It can never sign user transactions or touch user balances.
 - **SEP-10 auth**: authentication must follow Stellar SEP-10 (challenge/response). Users sign challenges locally with their decrypted key; the server verifies signatures and issues a signed token.
 - **Cloudflare D1 limitations**: SQLite-based; keep transactions short, batch writes, and be aware of D1's per-request write limits.
-- **Cloudflare compatibility**: Next server code must avoid Node-only APIs; verify native modules (`argon2`) and edge crypto (`jose`, Stellar SDK) work on Workers.
+- **Cloudflare compatibility**: Next server code must avoid Node-only APIs; verify native modules (`argon2`) and edge crypto (`jose`, Stellar SDK) work on Workers. Server-side password hashing uses Web Crypto PBKDF2-SHA256 (native on Workers); do not reintroduce hash-wasm/WASM-compiled KDFs (workerd disallows runtime WASM compilation and pure-JS argon2 blocks the event loop).
 - **PWA requirements**: core flows (login, balance view, pay) must work offline with sensible caching. Do not break service-worker compatibility with server-only dependencies in client bundles.
 - **Verification**: only verified users receive free gifts. Email, SMS, and Google Authenticator (TOTP) are all supported verification methods; design verification as a pluggable set of providers.
 - **Telegram bot security**: the bot executes **read-only** wallet actions (balance, shop list, history) only after the user's Telegram identity is bound and authorized. Payment execution stays in the PWA until Telegram MiniApp work is scheduled. LLM prompts and responses never receive or contain secret keys, recovery phrases, or signed transactions.

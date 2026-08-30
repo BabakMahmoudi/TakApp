@@ -52,6 +52,10 @@ async function handle(request: StellarWorkerRequest): Promise<void> {
       case 'submit-change-trust': {
         const keypair = Keypair.fromSecret(request.secretKey);
         const server = new Horizon.Server(request.horizonUrl);
+        // Bound every Horizon hop so a slow network fails visibly instead of
+        // hanging the activation screen forever (mirrors the server-side
+        // funding hardening).
+        server.httpClient.defaults.timeout = 15_000;
         const account = await server.loadAccount(keypair.publicKey());
         const asset = new Asset(request.assetCode, request.assetIssuer);
         const transaction = new TransactionBuilder(account, {
@@ -62,8 +66,33 @@ async function handle(request: StellarWorkerRequest): Promise<void> {
           .setTimeout(60)
           .build();
         transaction.sign(keypair);
-        const result = await server.submitTransaction(transaction);
-        respond({ requestId: request.requestId, type: 'submitted', txHash: result.hash });
+        const url = `${request.horizonUrl.replace(/\/+$/, '')}/transactions`;
+        const body = new URLSearchParams({ tx: transaction.toXDR() });
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body,
+          signal: AbortSignal.timeout(20_000),
+        });
+        const text = await response.text();
+        let payload: unknown = text;
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          // keep raw text for the error message
+        }
+        if (!response.ok) {
+          const detail =
+            typeof payload === 'object' && payload !== null && 'detail' in payload
+              ? String((payload as Record<string, unknown>).detail)
+              : text;
+          throw new Error(`Horizon trustline submission failed (HTTP ${response.status}): ${detail}`);
+        }
+        const hash =
+          typeof payload === 'object' && payload !== null && 'hash' in payload
+            ? String((payload as Record<string, unknown>).hash)
+            : '';
+        respond({ requestId: request.requestId, type: 'submitted', txHash: hash });
         break;
       }
     }

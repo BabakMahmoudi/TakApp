@@ -3,18 +3,33 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { jwtVerify } from 'jose';
 import { users } from '@takapp/shared/db';
 import type { User } from '@takapp/shared/db';
+import { serializeError } from '../logging';
 import type { TrpcContext } from './context';
 
 const t = initTRPC.context<TrpcContext>().create();
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+
+const logMiddleware = t.middleware(async ({ ctx, path, next }) => {
+  const started = Date.now();
+  console.log(`[trpc] start ${path} reqId=${ctx.reqId}`);
+  try {
+    const result = await next();
+    console.log(`[trpc] ok ${path} (${Date.now() - started}ms) reqId=${ctx.reqId}`);
+    return result;
+  } catch (error) {
+    console.error(`[trpc] error ${path} (${Date.now() - started}ms) reqId=${ctx.reqId}: ${serializeError(error)}`);
+    throw error;
+  }
+});
+
+export const publicProcedure = t.procedure.use(logMiddleware);
 
 export interface AuthedContext extends TrpcContext {
   user: User;
 }
 
-export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
   const header = ctx.req.headers.get('authorization');
   const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
   if (!token) {

@@ -12,10 +12,11 @@ describe('recovery mnemonic', () => {
   });
 
   it('rejects tampered mnemonics', () => {
-    const mnemonic = generateMnemonicPhrase();
-    const words = mnemonic.split(' ');
-    const tampered = [...words.slice(0, 11), words[0]].join(' ');
-    expect(isValidMnemonicPhrase(tampered)).toBe(false);
+    // BIP39 test vector: 11x abandon + "about" is valid; changing the final
+    // word to "abandon" flips the embedded 4-bit checksum so it must fail.
+    const valid = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+    expect(isValidMnemonicPhrase(valid)).toBe(true);
+    expect(isValidMnemonicPhrase('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon')).toBe(false);
     expect(isValidMnemonicPhrase('abandon abandon abandon')).toBe(false);
   });
 

@@ -13,6 +13,23 @@ type ErrorMessage = { message: string } | null;
 
 const WAIT_RETRIES = 10;
 const WAIT_DELAY_MS = 2000;
+const ATTEMPT_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 export default function WalletShell() {
   const [phase, setPhase] = useState<Phase>(() => (getSession() ? 'balance' : 'welcome'));
@@ -27,6 +44,7 @@ export default function WalletShell() {
   const signupMutation = trpc.auth.signup.useMutation();
   const challengeMutation = trpc.auth.challenge.useMutation();
   const loginMutation = trpc.auth.login.useMutation();
+  const clientLogMutation = trpc.auth.clientLog.useMutation();
   const balanceQuery = trpc.wallet.balance.useQuery({}, {
     enabled: phase === 'balance',
     retry: false,
@@ -35,6 +53,10 @@ export default function WalletShell() {
     enabled: phase === 'trustline',
     retry: false,
   });
+
+  function beacon(message: string): void {
+    void clientLogMutation.mutateAsync({ message }).catch(() => undefined);
+  }
 
   function worker(): StellarWorkerClient {
     if (!workerRef.current) workerRef.current = createStellarWorkerClient();
@@ -45,9 +67,11 @@ export default function WalletShell() {
     setError(null);
     setBusy(true);
     try {
-      const { publicKey, secretKey } = await worker().generateKeypair();
       const mnemonic = generateMnemonicPhrase();
       if (!isValidMnemonicPhrase(mnemonic)) throw new Error('Failed to generate a valid mnemonic');
+      // Derive the keypair from the mnemonic so a future recovery from these
+      // 12 words reproduces the exact same account that was registered.
+      const { publicKey, secretKey } = await worker().deriveFromMnemonic(mnemonic);
       flowRef.current = { publicKey, secretKey, mnemonic };
       credentialsRef.current = { email, password };
       setPhase('mnemonic');
@@ -96,9 +120,12 @@ export default function WalletShell() {
     trustlineSubmittedRef.current = true;
     void (async () => {
       try {
+        beacon('trustline: submitChangeTrust start');
         await submitChangeTrustWithRetry(flow.secretKey, config, worker());
+        beacon('trustline: submitChangeTrust ok');
         await runLogin(credentialsRef.current?.password ?? '', flow.publicKey);
       } catch (cause) {
+        beacon(`trustline: flow failed: ${cause instanceof Error ? cause.message : String(cause)}`);
         setError({ message: cause instanceof Error ? cause.message : String(cause) });
         setPhase('login');
       }
@@ -113,17 +140,22 @@ export default function WalletShell() {
   ): Promise<void> {
     let lastError: unknown;
     for (let attempt = 0; attempt < WAIT_RETRIES; attempt++) {
+      beacon(`trustline: attempt ${attempt + 1}/${WAIT_RETRIES}`);
       try {
-        await client.submitChangeTrust({
-          secretKey,
-          assetCode: config.takAsset.code,
-          assetIssuer: config.takAsset.issuer,
-          horizonUrl: config.horizonUrl,
-          networkPassphrase: config.networkPassphrase,
-        });
+        await withTimeout(
+          client.submitChangeTrust({
+            secretKey,
+            assetCode: config.takAsset.code,
+            assetIssuer: config.takAsset.issuer,
+            horizonUrl: config.horizonUrl,
+            networkPassphrase: config.networkPassphrase,
+          }),
+          ATTEMPT_TIMEOUT_MS,
+        );
         return;
       } catch (cause) {
         lastError = cause;
+        beacon(`trustline: attempt ${attempt + 1} failed: ${cause instanceof Error ? cause.message : String(cause)}`);
         await new Promise((resolve) => setTimeout(resolve, WAIT_DELAY_MS));
       }
     }
@@ -137,6 +169,7 @@ export default function WalletShell() {
       const wallet = await getWallet();
       if (!wallet) throw new Error('No wallet found on this device');
       const publicKey = publicKeyOverride ?? wallet.publicKey;
+      beacon(`login: start publicKey=${publicKey.slice(0, 6)}`);
       const challenge = await challengeMutation.mutateAsync({ publicKey });
       const key = await deriveEncryptionKey(password, fromBase64(wallet.salt));
       const secretKey = await decryptSecret(key, wallet.iv, wallet.encryptedSecret);
@@ -152,8 +185,10 @@ export default function WalletShell() {
         nonce: challenge.nonce,
       });
       saveSession({ token: result.token, publicKey });
+      beacon('login: ok');
       setPhase('balance');
     } catch (cause) {
+      beacon(`login: failed: ${cause instanceof Error ? cause.message : String(cause)}`);
       setError({ message: cause instanceof Error ? cause.message : String(cause) });
     } finally {
       setBusy(false);

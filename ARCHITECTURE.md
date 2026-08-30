@@ -102,7 +102,7 @@ flowchart LR
 
 > The Drizzle schema lives in `packages/shared/src/db/schema.ts` and is the single source of truth for DB types; app code derives `typeof` types from it.
 
-- `users` — id, stellar public key (unique), email/phone (unique, nullable), display name, password hash (argon2), verification state.
+- `users` — id, stellar public key (unique), email/phone (unique, nullable), display name, password hash (PBKDF2-SHA256), verification state.
 - `sessions` — SEP-10 token / nonce tracking, expiry.
 - `verifications` — type (email/sms/totp), identifier, status, one-time code digest, expiry.
 - `telegram_bindings` — user id, telegram user id (unique), telegram username, bound/authorized at, last seen.
@@ -148,7 +148,7 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 - **Zero-knowledge keys**: the server stores only public keys. Secret keys, mnemonics, and derived encryption material never leave the device.
 - **Funding account (bounded exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It funds new accounts (`createAccount`) and issues TAK — nothing else. It can never sign user transactions or touch user balances; the exception is documented and bounded in code.
 - **SEP-10 challenge** is single-use, time-limited, and bound to the user's public key; tampered or replayed challenges are rejected (covered by tests).
-- **Password storage**: hashed with argon2 on the server for the account password; the derived encryption key is salted/iterated PBKDF2 on the client.
+- **Password storage**: hashed with PBKDF2-HMAC-SHA256 (600k iterations, Web Crypto) on the server for the account password; the derived encryption key is salted/iterated PBKDF2 on the client.
 - **Rate limiting** on login, verification-code resend, and challenge issuance.
 - **Bot authorization**: read-only wallet queries from Telegram run only for users whose Telegram identity is bound and authorized; bindings can be revoked. The bot has no signing path.
 - **LLM as untrusted input**: DeepSeek output is parsed into a restricted, validated read-only command set; free-form LLM text can never drive privileged actions or reach the signing path.

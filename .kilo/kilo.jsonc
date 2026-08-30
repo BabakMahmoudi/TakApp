@@ -1,0 +1,15 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "snapshot": false,
+  "permission": {
+    // ... other permissions ...
+    "edit": {
+      // Allow edits to root-level AGENTS.md and architecture.md
+      "AGENTS.md": "allow",
+      "ARCHITECTURE.md": "allow",
+      
+      // Keep the broad fallback as "ask" for safety
+      "*": "ask"
+    }
+  }
+}

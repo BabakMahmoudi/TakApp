@@ -1,4 +1,4 @@
-import { Horizon } from '@stellar/stellar-sdk';
+import { Horizon } from '@stellar/stellar-sdk/no-axios';
 import { balanceSchema } from '@takapp/shared/zod-schemas';
 import { fetchBalances } from '../../stellar/horizon';
 import { protectedProcedure, publicProcedure, router } from '../trpc';
