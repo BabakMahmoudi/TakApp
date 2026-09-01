@@ -6,20 +6,18 @@ export interface SignChallengeInput {
   networkPassphrase: string;
 }
 
-export interface SubmitChangeTrustInput {
+export interface SubmitPaymentInput {
   secretKey: string;
-  assetCode: string;
+  destination: string;
+  amount: string;
   assetIssuer: string;
   horizonUrl: string;
   networkPassphrase: string;
 }
 
-export interface SubmitPaymentInput {
+export interface EnsureTrustlineInput {
   secretKey: string;
-  destination: string;
-  assetCode: string;
   assetIssuer: string;
-  amount: string;
   horizonUrl: string;
   networkPassphrase: string;
 }
@@ -28,8 +26,8 @@ export interface StellarWorkerClient {
   generateKeypair(): Promise<{ publicKey: string; secretKey: string }>;
   deriveFromMnemonic(mnemonic: string): Promise<{ publicKey: string; secretKey: string }>;
   signChallenge(input: SignChallengeInput): Promise<string>;
-  submitChangeTrust(input: SubmitChangeTrustInput): Promise<string>;
   submitPayment(input: SubmitPaymentInput): Promise<string>;
+  ensureTrustline(input: EnsureTrustlineInput): Promise<string | null>;
   terminate(): void;
 }
 
@@ -87,14 +85,14 @@ export function createStellarWorkerClient(): StellarWorkerClient {
       if (response.type !== 'signed-xdr') throw new Error('Unexpected worker response');
       return response.signedXdr;
     },
-    async submitChangeTrust(input: SubmitChangeTrustInput) {
-      const response = await send({ type: 'submit-change-trust', ...input });
-      if (response.type !== 'submitted') throw new Error('Unexpected worker response');
-      return response.txHash;
-    },
     async submitPayment(input: SubmitPaymentInput) {
       const response = await send({ type: 'submit-payment', ...input });
       if (response.type !== 'submitted') throw new Error('Unexpected worker response');
+      return response.txHash;
+    },
+    async ensureTrustline(input: EnsureTrustlineInput) {
+      const response = await send({ type: 'ensure-trustline', ...input });
+      if (response.type !== 'trustline') throw new Error('Unexpected worker response');
       return response.txHash;
     },
     terminate() {

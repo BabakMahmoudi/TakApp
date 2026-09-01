@@ -1,7 +1,17 @@
-import { Horizon } from '@stellar/stellar-sdk/no-axios';
-import { stroopsFromLumens } from '@takapp/shared/money';
+import {
+  Address,
+  Contract,
+  Horizon,
+  TransactionBuilder,
+  scValToNative,
+} from '@stellar/stellar-sdk/no-axios';
+import { Api as SorobanApi, Server as SorobanRpc } from '@stellar/stellar-sdk/no-axios/rpc';
+import { stroopsFromLumens, stroopsFromTokenRaw } from '@takapp/shared/money';
 
 export type HorizonServer = Pick<Horizon.Server, 'loadAccount'>;
+export type SorobanRpcServer = Pick<SorobanRpc, 'simulateTransaction'>;
+
+export const TAK_DECIMALS = 7;
 
 export interface BalanceEntry {
   asset: 'XLM' | 'TAK';
@@ -10,26 +20,38 @@ export interface BalanceEntry {
 
 export async function fetchBalances(
   server: HorizonServer,
+  rpc: SorobanRpcServer,
   publicKey: string,
-  takIssuer: string,
+  takContractId: string,
+  networkPassphrase: string,
 ): Promise<BalanceEntry[]> {
   const account = await server.loadAccount(publicKey);
   const entries: BalanceEntry[] = [];
   for (const balance of account.balances) {
     if (balance.asset_type === 'native') {
       entries.push({ asset: 'XLM', stroops: stroopsFromLumens(balance.balance) });
-    } else if (
-      balance.asset_type === 'credit_alphanum4' &&
-      balance.asset_code === 'TAK' &&
-      balance.asset_issuer === takIssuer
-    ) {
-      entries.push({ asset: 'TAK', stroops: stroopsFromLumens(balance.balance) });
     }
   }
-  return entries;
-}
 
-export async function hasTrustline(server: HorizonServer, publicKey: string, takIssuer: string): Promise<boolean> {
-  const balances = await fetchBalances(server, publicKey, takIssuer);
-  return balances.some((entry) => entry.asset === 'TAK');
+  const operation = new Contract(takContractId).call('balance', new Address(publicKey).toScVal());
+  const transaction = new TransactionBuilder(account, {
+    fee: '100',
+    networkPassphrase,
+  })
+    .addOperation(operation)
+    .setTimeout(0)
+    .build();
+  const simulation = await rpc.simulateTransaction(transaction);
+  if (SorobanApi.isSimulationError(simulation)) {
+    throw new Error(`TAK balance simulation failed: ${simulation.error}`);
+  }
+  if (!simulation.result) {
+    throw new Error('TAK balance simulation returned no result');
+  }
+  const raw = scValToNative(simulation.result.retval);
+  if (typeof raw !== 'bigint') {
+    throw new Error(`Unexpected TAK balance return value: ${String(raw)}`);
+  }
+  entries.push({ asset: 'TAK', stroops: stroopsFromTokenRaw(raw, TAK_DECIMALS) });
+  return entries;
 }

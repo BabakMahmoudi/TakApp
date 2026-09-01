@@ -60,3 +60,14 @@ export function stroopsFromLumens(lumens: string): string {
   const fraction = match[2] ? BigInt(match[2].padEnd(7, '0')) : 0n;
   return (whole * STROOPS_PER_LUMEN + fraction).toString();
 }
+
+export function stroopsFromTokenRaw(raw: bigint | string, decimals: number): string {
+  const value = typeof raw === 'string' ? parseStroops(raw) : raw;
+  if (value < 0n) {
+    throw new Error(`Invalid token raw amount: "${raw}" (must be non-negative)`);
+  }
+  if (decimals === 7) return value.toString();
+  const scale = 10n ** BigInt(Math.abs(7 - decimals));
+  if (decimals < 7) return (value * scale).toString();
+  return (value / scale).toString();
+}

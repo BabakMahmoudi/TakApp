@@ -47,7 +47,8 @@ async function resolveOwnerUserId(
 
 export const adminRouter = router({
   status: protectedProcedure.query(async ({ ctx }) => ({
-    role: ctx.user.role,
+    role: isAdminUser(ctx.user, ctx.env.ADMIN_PUBLIC_KEY) ? 'admin' : ctx.user.role,
+    isAdmin: isAdminUser(ctx.user, ctx.env.ADMIN_PUBLIC_KEY),
     totpEnrolled: ctx.user.totpSecret != null,
     totpRequired: isTotpRequired(ctx.env),
   })),

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TakApp is a non-custodial wallet for the Stellar blockchain, delivered as a Progressive Web App (PWA). Users pay in the project's own token, **TAK** (issued on Stellar), to buy coffee in selected local coffee shops. The app also supports XLM and establishes a TAK trustline.
+TakApp is a non-custodial wallet for the Stellar blockchain, delivered as a Progressive Web App (PWA). Users pay in the project's own token, **TAK** (a classic Stellar asset: code `TAK` plus issuer account, 7 decimals), to buy coffee in selected local coffee shops. The app also supports XLM.
 
 A companion **Telegram bot** gives users an LLM-driven, natural-language experience (e.g., "show my balance", "where can I pay?") powered by **DeepSeek** as the LLM. The bot is **read-only for v1**: balances, shop list, and history. Payment execution stays in the PWA until Telegram MiniApp work is scheduled.
 
@@ -24,7 +24,7 @@ This file guides AI agents and human contributors working in this repository. Re
 | Package manager | pnpm 10 |
 | Runtime | Node 22 LTS |
 | Blockchain | Stellar (`@stellar/stellar-sdk`), SEP-10 authentication, testnet for dev |
-| Account activation | Server-held funding account (secret in env; funds activation + TAK issuance; never touches user balances) |
+| Account activation | Server-held funding account (secret in env; funds activation with XLM; never touches user balances) |
 | Verification (v1) | TOTP (`otplib`) + pluggable `VerificationProvider` interface (email/SMS stubbed) |
 | Client app | PWA (offline-capable, installable) |
 | Telegram bot | grammY (webhook, Cloudflare Workers adapter), read-only for v1 |
@@ -73,7 +73,7 @@ apps/
     src/app/               # routes + PWA shell + manifest + service worker
     src/app/api/trpc/      # tRPC fetch adapter route handler
     src/server/trpc/       # tRPC router definitions + context (auth + D1)
-    src/server/stellar/    # Horizon client, SEP-10 helpers, funding helper, TAK asset
+    src/server/stellar/    # Horizon clients, SEP-10 helpers, funding helper
     src/lib/               # client crypto (WebCrypto/PBKDF2), recovery, tRPC provider
   bot/                     # Telegram bot (grammY webhook Cloudflare Worker, read-only)
     src/llm/               # DeepSeek integration, intent parsing/prompt templates
@@ -89,12 +89,12 @@ packages/
 ## Important Constraints
 
 - **Non-custodial**: the server can never move user funds. It holds no user secret keys. Admin operations never touch user balances.
-- **Funding account (bounded zero-key exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It is used only to fund new accounts (`createAccount`) and issue TAK. It can never sign user transactions or touch user balances.
+- **Funding account (bounded zero-key exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It is used only to fund new accounts (`createAccount`, XLM). It can never sign user transactions, issue or move TAK, or touch user balances.
 - **SEP-10 auth**: authentication must follow Stellar SEP-10 (challenge/response). Users sign challenges locally with their decrypted key; the server verifies signatures and issues a signed token.
 - **Cloudflare D1 limitations**: SQLite-based; keep transactions short, batch writes, and be aware of D1's per-request write limits.
 - **Cloudflare compatibility**: Next server code must avoid Node-only APIs; verify native modules (`argon2`) and edge crypto (`jose`, Stellar SDK) work on Workers. Server-side password hashing uses Web Crypto PBKDF2-SHA256 (native on Workers); do not reintroduce hash-wasm/WASM-compiled KDFs (workerd disallows runtime WASM compilation and pure-JS argon2 blocks the event loop).
 - **PWA requirements**: core flows (login, balance view, pay) must work offline with sensible caching. Do not break service-worker compatibility with server-only dependencies in client bundles.
-- **Verification**: only verified users receive free gifts. Email, SMS, and Google Authenticator (TOTP) are all supported verification methods; design verification as a pluggable set of providers.
+- **Verification**: Email, SMS, and Google Authenticator (TOTP) are all supported verification methods; design verification as a pluggable set of providers.
 - **Telegram bot security**: the bot executes **read-only** wallet actions (balance, shop list, history) only after the user's Telegram identity is bound and authorized. Payment execution stays in the PWA until Telegram MiniApp work is scheduled. LLM prompts and responses never receive or contain secret keys, recovery phrases, or signed transactions.
 - **LLM safety**: treat DeepSeek output as untrusted input. Never let free-form LLM text drive privileged actions directly; parse intent into a restricted, validated command set before execution.
 
@@ -103,3 +103,5 @@ packages/
 - Follow the architecture described in `ARCHITECTURE.md`. If a change conflicts with it, update that document in the same change.
 - Every feature that touches balances, keys, or auth must include tests covering the failure paths (insufficient funds, wrong password, expired challenge, tampered request).
 - Before committing: run `pnpm typecheck`, `pnpm lint`, and the relevant tests.
+- It may happen that my internet connection be filtered by government. If it seems that general tools like npm deos not work
+  or you feel strange network behaviour you may use this proxy http:/localhost:2352 both for http and https/

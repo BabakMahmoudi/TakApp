@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { clearAdminToken, getAdminToken, saveAdminToken } from '../lib/storage';
 import { trpc } from '../lib/trpc/trpc';
+import { useWallet } from '../lib/wallet-provider';
 
 type View = 'enroll' | 'stepup' | 'manage';
 
@@ -19,9 +20,8 @@ const inputClass = 'rounded-md border border-coffee-700 bg-coffee-950 px-3 py-2 
 const buttonClass = 'rounded-md bg-coffee-600 px-3 py-1.5 text-sm font-medium text-coffee-50 disabled:opacity-50';
 
 export default function AdminPanel() {
-  const [open, setOpen] = useState(false);
+  const { adminStatusQuery } = useWallet();
   const [view, setView] = useState<View>(() => (getAdminToken() ? 'manage' : 'stepup'));
-  const statusQuery = trpc.admin.status.useQuery(undefined, { retry: false });
 
   const handleAuthError = useCallback((error: unknown): void => {
     if (!isAdminAuthError(error)) return;
@@ -29,29 +29,18 @@ export default function AdminPanel() {
     setView('stepup');
   }, []);
 
-  if (statusQuery.isLoading || !statusQuery.data) return null;
-  if (statusQuery.data.role !== 'admin') return null;
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="rounded-md border border-coffee-700 px-3 py-1.5 text-sm text-coffee-200">
-        Admin
-      </button>
-    );
+  if (!adminStatusQuery.data) return null;
+  if (!adminStatusQuery.data.isAdmin) {
+    return <p className="text-sm text-red-400">Not authorized</p>;
   }
 
   return (
     <section className="rounded-xl bg-coffee-900 p-4 shadow">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-coffee-100">Admin</h2>
-        <button onClick={() => setOpen(false)} className="text-sm text-coffee-300">
-          Close
-        </button>
-      </div>
+      <h2 className="mb-3 text-lg font-semibold text-coffee-100">Admin</h2>
       {view === 'enroll' && <EnrollView onDone={() => setView('stepup')} onAuthError={handleAuthError} />}
       {view === 'stepup' && (
         <StepUpView
-          totpRequired={statusQuery.data.totpRequired}
+          totpRequired={adminStatusQuery.data.totpRequired}
           onDone={(token) => {
             saveAdminToken(token);
             setView('manage');

@@ -3,20 +3,18 @@ export type StellarWorkerRequestPayload =
   | { type: 'derive-from-mnemonic'; mnemonic: string }
   | { type: 'sign-challenge'; xdr: string; secretKey: string; networkPassphrase: string }
   | {
-      type: 'submit-change-trust';
+      type: 'submit-payment';
       secretKey: string;
-      assetCode: string;
+      destination: string;
+      amount: string;
       assetIssuer: string;
       horizonUrl: string;
       networkPassphrase: string;
     }
   | {
-      type: 'submit-payment';
+      type: 'ensure-trustline';
       secretKey: string;
-      destination: string;
-      assetCode: string;
       assetIssuer: string;
-      amount: string;
       horizonUrl: string;
       networkPassphrase: string;
     };
@@ -27,4 +25,5 @@ export type StellarWorkerResponse =
   | { requestId: string; type: 'keypair'; publicKey: string; secretKey: string }
   | { requestId: string; type: 'signed-xdr'; signedXdr: string }
   | { requestId: string; type: 'submitted'; txHash: string }
+  | { requestId: string; type: 'trustline'; txHash: string | null }
   | { requestId: string; type: 'error'; message: string };

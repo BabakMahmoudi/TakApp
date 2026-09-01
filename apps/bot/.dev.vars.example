@@ -1,3 +1,8 @@
 # Local dev secrets for the bot worker (copy to .dev.vars and fill in).
 BOT_TOKEN=123456:replace-with-your-bot-token
 DEEPSEEK_API_KEY=sk-replace-with-your-deepseek-key
+# Classic TAK issuer (cafe-bazi's existing TAK issuing account). Code is the constant "TAK".
+TAK_ISSUER_PUBLIC_KEY=GD34LHPQRSZKJGTDSTAFHLTJ4AOS77JEAVMXVITLEI2XYCNSH64SIGRM
+# TAK is a SEP-41 Soroban token: balance is read from this contract via Soroban RPC.
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+TAK_CONTRACT_ID=CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C

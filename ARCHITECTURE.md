@@ -2,7 +2,7 @@
 
 ## Overview
 
-TakApp is a **non-custodial** mobile-first PWA that lets users pay for coffee with the project's own **TAK** token on the Stellar blockchain. Users hold and control their own Stellar keys; the backend never stores or sees secret keys and can never move user funds.
+TakApp is a **non-custodial** mobile-first PWA that lets users pay for coffee with the project's own **TAK** token on the Stellar blockchain. TAK is a **classic Stellar asset** — code `TAK`, defined by an issuer account (7 decimals). Users hold and control their own Stellar keys; the backend never stores or sees secret keys and can never move user funds.
 
 A companion **Telegram bot** lets users ask read-only questions conversationally — "show my balance", "where can I pay?" — with **DeepSeek** translating natural language into a restricted, validated command set. Payment execution stays in the PWA until Telegram MiniApp work is scheduled.
 
@@ -12,16 +12,16 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 
 - Let any user create a Stellar-backed wallet with only an email or phone number.
 - Make paying for coffee in local shops as simple as tapping a button.
-- Support **TAK** and **XLM** balances with a TAK trustline established on signup.
+- Support **TAK** (a classic Stellar asset, code `TAK` + issuer) and **XLM** balances.
 - Be fully functional offline for login, balance view, and payment flows.
-- Support email, SMS, and Google Authenticator verification; only verified users receive free gifts.
+- Support email, SMS, and Google Authenticator verification.
 - Give admins the ability to manage coffee shops; support a "coffee shop owner" role.
 - Let users check balances, browse the shop list, and review history through a **read-only** Telegram bot assistant powered by natural language; payment execution stays in the PWA.
 
 ## Non-Goals
 
 - Custodial storage of user funds or keys.
-- Server-side signing of user transactions (the server never touches user balances; the only exception is the bounded funding account, which issues TAK gifts and funds new accounts).
+- Server-side signing of user transactions (the server never touches user balances; the only exception is the bounded funding account, which funds new accounts with XLM).
 - Support for other blockchains.
 
 ## Technology Decisions
@@ -37,7 +37,8 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 | Tailwind CSS v4 | Utility-first styling with a PostCSS plugin (`@tailwindcss/postcss`); coffee-themed base palette. |
 | Drizzle ORM | Lightweight, type-safe SQLite queries; schema doubles as the type source of truth. |
 | BIP-39 12-word mnemonic | Standard, interoperable recovery phrase; derived seed regenerates the Stellar keypair. |
-| Server-held funding account | Bounded zero-key exception: one secret (`FUNDING_SECRET`) funds new accounts and issues TAK; it can never sign user transactions or touch user balances. |
+| Server-held funding account | Bounded zero-key exception: one secret (`FUNDING_SECRET`) funds new accounts with XLM; it can never sign user transactions, issue or move TAK, or touch user balances. |
+| Classic TAK asset (Stellar) | TAK is a classic Stellar asset defined by code `TAK` + an issuer account. Balances are read from the account's Horizon trustline; payments use `Operation.payment`; trustlines are accepted with `Operation.changeTrust`. |
 | Verification (TOTP first) | `otplib` TOTP implemented behind a pluggable `VerificationProvider` interface; email/SMS stubbed for v1. |
 | Telegram bot (grammY, webhook) | Meets users in Telegram; webhook mode suits Workers (no long polling); grammY's Cloudflare Workers adapter runs as a Worker `fetch` handler. |
 | DeepSeek via `openai` SDK | Cheap, capable natural-language parsing; `baseURL: https://api.deepseek.com`, model `deepseek-chat`; output is treated as untrusted and mapped to a restricted read-only command set. |
@@ -51,7 +52,7 @@ flowchart LR
   TRPC --> D1[(Cloudflare D1<br/>SQLite)]
   Next --> HRZ[Horizon API<br/>Stellar]
   Next --> SEP10[SEP-10 challenge/verify]
-  Next --> Fund[Funding account<br/>createAccount + TAK issuance]
+  Next --> Fund[Funding account<br/>createAccount (XLM)]
   WebWorker[Signing Web Worker<br/>in browser] --> HRZ
   WebWorker --> Next
   Bot[Telegram] --> BotSvc[Telegram Bot grammY<br/>Cloudflare Worker]
@@ -65,10 +66,10 @@ flowchart LR
 - **tRPC server**: All communication (auth, wallet, coffee-shop, admin, users, payments) goes through tRPC procedures hosted in the Worker. `users` exposes profile read/edit and a display-name + public-key search; `payments.record` indexes client-submitted payments idempotently by tx hash.
 - **Telegram bot (grammY)**: A separate Cloudflare Worker receiving Telegram webhooks via grammY's `webhookCallback(..., 'cloudflare')`. It forwards user messages to DeepSeek, parses the result into a restricted **read-only** command set (balance, shops, history), and executes those commands against D1. There is no signing path in the bot.
 - **DeepSeek**: Natural-language intent parser. It is stateless and returns structured intent only (no free-form execution); prompts never receive secret keys or signed data.
-- **Funding account**: A single server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`) on signup, issues TAK, and issues the one-time **welcome gift** (10 TAK). It never signs user transactions and never touches user balances.
+- **Funding account**: A single server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`, XLM) on signup. It never signs user transactions, never issues or moves TAK, and never touches user balances.
 - **packages/shared**: Drizzle schema, stroop money helpers, zod schemas, and verification providers shared by the web and bot workers; the schema is the single source of truth for DB types.
 - **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, coffee shops, payments, and gifts.
-- **Stellar (Horizon)**: Reads balances, submits payments/trustline operations. The server only submits operations for its own accounts (e.g., TAK issuance, account funding) — never for user accounts.
+- **Stellar (Horizon)**: Reads XLM/TAK balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding) — never for user accounts.
 
 ## Authentication & Key Management
 
@@ -78,7 +79,8 @@ flowchart LR
 2. Client derives an encryption key from the password (PBKDF2, high iteration count) and generates a Stellar keypair.
 3. The secret key is encrypted and stored in browser storage only. The 12-word mnemonic is shown once for recovery (never persisted server-side).
 4. The server creates a user row keyed by the Stellar **public key**; it never sees the secret.
-5. The server funds the new account from the funding account (`createAccount`), and the client establishes the TAK trustline; the server confirms account activation on-chain.
+5. The server funds the new account from the funding account (`createAccount`, XLM).
+6. The client establishes the TAK trustline (`Operation.changeTrust`, signed in the Web Worker) so the account can hold the classic TAK asset. This is idempotent and fail-open: login proceeds even if it fails, and the trustline self-heals before the first TAK send.
 
 ### Login (SEP-10)
 
@@ -105,7 +107,6 @@ flowchart LR
 - **Email**, **SMS**, and **Google Authenticator (TOTP)** providers behind a common `VerificationProvider` interface in `packages/shared`.
 - Each provider is independent: one-time codes are verified and marked in D1.
 - v1 ships the **TOTP** provider (via `otplib`) fully implemented; email/SMS are stubbed behind the same interface.
-- Only users with at least one completed verification are eligible for free gifts.
 
 ## Data Model (initial)
 
@@ -118,7 +119,7 @@ flowchart LR
 - `conversations` — user id, telegram chat id, short-lived context window for bot replies (no secrets, expiry enforced).
 - `coffee_shops` — id, owner user id, name, address, active status, editable by admins.
 - `payments` — id, user id, coffee shop id (nullable), `recipient_public_key` (the actual on-chain destination for both shop and P2P payments, so history stays stable if names change), amount (string, stroops), asset (TAK/XLM), **unique tx hash**, status (`submitted`), timestamp. `payments.record` is idempotent on `tx_hash` so client retries after network failures never double-insert.
-- `gifts` — issued free gifts for verified users; a `type='tak-welcome'` row marks the one-time 10 TAK claim.
+- `gifts` — retained for schema compatibility but no longer used (the welcome-gift flow was removed).
 - `admin_audit_log` — id, admin user id, action (`totp.enrolled`, `admin.login`, `promote`, `demote`, `shop.create`, `shop.update`, `shop.disable`), optional target, timestamp.
 - `admin_step_up_attempts` — one row per user tracking failed step-up attempts and the lockout timestamp.
 
@@ -130,21 +131,15 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 
 1. On signup, the server uses the funding account (`FUNDING_SECRET`, env only) to submit a `createAccount` transaction funding the new user's public key with the minimum XLM balance.
 2. In local development the funding account itself is funded first via **Friendbot** on testnet; there is no Friendbot equivalent on mainnet.
-3. The funding account also issues TAK (trustline first). It is the only server-held key and is never used for user transactions.
+3. The funding account is the only server-held key and is never used for user transactions; it never issues or moves TAK.
 
 ### Pay for coffee / send TAK
 
 1. User selects a shop (fixed price 1 TAK, destination = the shop owner's Stellar account) or searches for another registered user by display name / public-key prefix and enters an amount.
-2. The client signs the payment transaction in the Web Worker with the decrypted key (the worker retries the same transaction XDR on transient network failures, so a retry is idempotent).
-3. Transaction is submitted to Horizon directly from the client; the server never signs or submits it.
+2. The client ensures the TAK trustline exists (no-op if present), then builds a classic `Operation.payment` transaction, signs it in the Web Worker with the decrypted key, and submits it to Horizon (the worker retries the same transaction XDR on transient network failures, so a retry is idempotent).
+3. The transaction is submitted to Horizon directly from the client; the server never signs or submits it.
 4. The client reports the tx hash to `payments.record`, which validates the destination (active shop with an owner, or an existing non-self user), stores the resolved `recipient_public_key`, and inserts a `status='submitted'` row idempotently by `tx_hash`. On-chain reconciliation of these trust-based records is future work.
-5. Balances are refetched from Horizon after a successful payment.
-
-### Claim the welcome gift
-
-1. The user's account must already hold a TAK trustline (established at signup).
-2. `wallet.claimGift` checks no `type='tak-welcome'` gift row exists (one per user), verifies the trustline on-chain, and has the **funding account** submit a 10 TAK payment to the user — the only server-submitted payment in the system (bounded exception).
-3. The `gifts` row is inserted only after the on-chain send succeeds; a Horizon failure leaves no record, so the user can retry.
+5. Balances are refetched (XLM and TAK both from Horizon) after a successful payment.
 
 ### Admin / owner
 
@@ -166,7 +161,7 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 ## Security Model
 
 - **Zero-knowledge keys**: the server stores only public keys. Secret keys, mnemonics, and derived encryption material never leave the device.
-- **Funding account (bounded exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It funds new accounts (`createAccount`), issues TAK, and issues the one-time welcome gift — nothing else. It can never sign user transactions or touch user balances; the exception is documented and bounded in code.
+- **Funding account (bounded exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It funds new accounts (`createAccount`, XLM) — nothing else. It can never sign user transactions, issue or move TAK, or touch user balances; the exception is documented and bounded in code.
 - **Trust-based payment indexing**: `payments.record` trusts the client-reported `tx_hash`. It is idempotent (unique constraint), but a malicious client could report a fabricated hash. On-chain reconciliation is accepted as future work for v1.
 - **SEP-10 challenge** is single-use, time-limited, and bound to the user's public key; tampered or replayed challenges are rejected (covered by tests).
 - **Password storage**: hashed with PBKDF2-HMAC-SHA256 (600k iterations, Web Crypto) on the server for the account password; the derived encryption key is salted/iterated PBKDF2 on the client.
@@ -178,6 +173,19 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 - Admin procedures enforce role checks server-side; no privileged logic in client bundles.
 - D1 writes are transactional and batched to respect worker/D1 limits.
 
+## UI Structure
+
+The PWA is split across real App Router routes instead of a single-screen shell:
+
+- `/` — logged out: `AuthFlow` (welcome/signup/mnemonic/login); logged in: `HomeDashboard` (merged address + balances panel, navigation buttons).
+- `/buy` — buy coffee: shops list, "Buy coffee (1 TAK)" per shop.
+- `/send` — send TAK: recipient search + amount with stroop validation.
+- `/tak` — get TAK: informational entry pointing users to the testnet faucet / exchange.
+- `/profile` — profile: display-name editor plus read-only email/phone.
+- `/admin` — admin panel (TOTP step-up, shops/users management).
+
+Authenticated pages share a `WalletProvider` context (declared in `app/layout.tsx` inside `TRPCProvider`). It owns the in-memory session + decrypted secret key, the global `busy`/`error` state, the password prompt overlay (a fixed-position modal so payments can be signed from any page), the shared `wallet.balance`/`wallet.networkConfig`/`admin.status` queries, and the `signPayment`/`submitPayment`/`logout`/`completeLogin` actions. A `NavBar` with a hamburger dropdown menu (Home / Buy Coffee / Send TAK / Get TAK / Profile / Admin Panel if admin / Log out; closes on navigation, outside click, and Escape) renders on all authenticated pages and is hidden while logged out. Admin gating everywhere (menu link, home button, admin panel) comes from the provider's single shared `adminStatusQuery`/`isAdmin`, backed by the server-side `isAdminUser` rule (`role === 'admin'` or bootstrap public-key match).
+
 ## Deployment
 
 - Cloudflare Worker hosting the Next.js app via OpenNext (`@opennextjs/cloudflare`).
@@ -185,7 +193,7 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 - Both workers share `packages/shared` (schema, zod schemas, money helpers, verification providers).
 - D1 database with Drizzle migrations applied via `pnpm db:generate` / `pnpm db:migrate` (local first, remote explicitly).
 - PWA manifest + service worker (`@serwist/next`) generated at build time; core assets cached for offline use.
-- Environment variables hold Horizon URL, network passphrase (testnet in dev, public in prod), SEP-10 settings, `FUNDING_SECRET`, TAK issuer, `BOT_TOKEN`, and `DEEPSEEK_API_KEY` — never user keys. Admin secrets: `ADMIN_PUBLIC_KEY` (public, in `[vars]`), plus `ADMIN_JWT_SECRET` and `ADMIN_TOTP_ENC_KEY` (deployed via `wrangler secrets`). `ADMIN_TOTP_REQUIRED` (optional, default on) toggles whether the admin TOTP step-up is enforced.
+- Environment variables hold Horizon URL, the TAK issuer public key, network passphrase (testnet in dev, public in prod), SEP-10 settings, `FUNDING_SECRET`, `BOT_TOKEN`, and `DEEPSEEK_API_KEY` — never user keys. Admin secrets: `ADMIN_PUBLIC_KEY` (public, in `[vars]`), plus `ADMIN_JWT_SECRET` and `ADMIN_TOTP_ENC_KEY` (deployed via `wrangler secrets`). `ADMIN_TOTP_REQUIRED` (optional, default on) toggles whether the admin TOTP step-up is enforced.
 
 ## Testing Strategy
 

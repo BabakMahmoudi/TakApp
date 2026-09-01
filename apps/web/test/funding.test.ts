@@ -1,6 +1,6 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { submitCreateAccount, submitTakGift, type FundingServer } from '../src/server/stellar/funding';
+import { submitCreateAccount, type FundingServer } from '../src/server/stellar/funding';
 
 const HORIZON_URL = 'https://horizon-testnet.stellar.org';
 const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
@@ -101,53 +101,5 @@ describe('account funding', () => {
         horizonUrl: HORIZON_URL,
       }),
     ).rejects.toThrow(/ECONNREFUSED horizon/);
-  });
-});
-
-describe('TAK gift', () => {
-  it('submits a 10 TAK payment to the destination', async () => {
-    const funding = Keypair.random();
-    const destination = Keypair.random();
-    const takIssuer = Keypair.random().publicKey();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ hash: 'gift-hash' }, 200));
-    vi.stubGlobal('fetch', fetchMock);
-    const result = await submitTakGift(fakeServer(funding), {
-      networkPassphrase: NETWORK_PASSPHRASE,
-      fundingSecret: funding.secret(),
-      takIssuer,
-      destination: destination.publicKey(),
-      horizonUrl: HORIZON_URL,
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      `${HORIZON_URL}/transactions`,
-      expect.objectContaining({ method: 'POST' }),
-    );
-    expect(result).toEqual({ hash: 'gift-hash' });
-  });
-
-  it('surfaces Horizon rejection codes', async () => {
-    const funding = Keypair.random();
-    const destination = Keypair.random();
-    const takIssuer = Keypair.random().publicKey();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            extras: { result_codes: { transaction: 'tx_failed', operations: ['op_no_trust'] } },
-          },
-          400,
-        ),
-      ),
-    );
-    await expect(
-      submitTakGift(fakeServer(funding), {
-        networkPassphrase: NETWORK_PASSPHRASE,
-        fundingSecret: funding.secret(),
-        takIssuer,
-        destination: destination.publicKey(),
-        horizonUrl: HORIZON_URL,
-      }),
-    ).rejects.toThrow(/op_no_trust/);
   });
 });

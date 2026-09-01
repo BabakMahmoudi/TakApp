@@ -6,6 +6,7 @@ import {
   lumensFromStroops,
   parseStroops,
   stroopsFromLumens,
+  stroopsFromTokenRaw,
   subStroops,
 } from '../src/money';
 
@@ -51,5 +52,17 @@ describe('money', () => {
     expect(compareStroops('1', '1')).toBe(0);
     expect(isPositiveStroops('1')).toBe(true);
     expect(isPositiveStroops('0')).toBe(false);
+  });
+
+  it('scales SEP-41 token raw integers to the 7-decimal stroop scale', () => {
+    expect(stroopsFromTokenRaw(50_000_000_000n, 7)).toBe('50000000000');
+    expect(stroopsFromTokenRaw('50000000000', 7)).toBe('50000000000');
+    expect(stroopsFromTokenRaw(0n, 7)).toBe('0');
+    expect(stroopsFromTokenRaw(5000n, 6)).toBe('50000');
+    expect(stroopsFromTokenRaw(500_000_000_000n, 8)).toBe('50000000000');
+  });
+
+  it('rejects negative token raw amounts', () => {
+    expect(() => stroopsFromTokenRaw(-1n, 7)).toThrow();
   });
 });

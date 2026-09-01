@@ -1,5 +1,4 @@
 import {
-  Asset,
   Horizon,
   Keypair,
   Operation,
@@ -90,9 +89,8 @@ export async function submitCreateAccount(server: FundingServer, params: FundNew
     networkPassphrase: params.networkPassphrase,
   })
     .addOperation(
-      // Reserve math: a fresh account needs 2 * base_reserve (0.5 XLM) and a
-      // TAK trustline adds one more base_reserve, so 1.5 XLM is the bare
-      // minimum. Fund 5 XLM to cover the trustline plus a buffer for fees.
+      // Reserve math: a fresh account needs 2 * base_reserve (0.5 XLM).
+      // Fund 5 XLM to cover that minimum plus a buffer for transaction fees.
       Operation.createAccount({ destination: params.destination, startingBalance: '5' }),
     )
     .setTimeout(30)
@@ -151,50 +149,4 @@ export async function fundNewAccount(params: FundNewAccountParams): Promise<unkn
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Account funding failed: ${detail}`);
   }
-}
-
-export interface SendTakGiftParams {
-  horizonUrl: string;
-  networkPassphrase: string;
-  fundingSecret: string;
-  takIssuer: string;
-  destination: string;
-}
-
-export async function submitTakGift(server: FundingServer, params: SendTakGiftParams): Promise<unknown> {
-  const funding = Keypair.fromSecret(params.fundingSecret);
-  console.log(`[funding] sendTakGift funding=${funding.publicKey()} destination=${params.destination}`);
-  const started = Date.now();
-  const account = await server.loadAccount(funding.publicKey());
-  const tx = new TransactionBuilder(account, {
-    fee: '100',
-    networkPassphrase: params.networkPassphrase,
-  })
-    .addOperation(
-      Operation.payment({
-        destination: params.destination,
-        asset: new Asset('TAK', params.takIssuer),
-        amount: '10',
-      }),
-    )
-    .setTimeout(30)
-    .build();
-  tx.sign(funding);
-  console.log(`[funding] sendTakGift submit start (load ${Date.now() - started}ms)`);
-  try {
-    const result = await submitTransactionToHorizon(params.horizonUrl, tx);
-    console.log(`[funding] sendTakGift submit ok (${Date.now() - started}ms)`);
-    return result;
-  } catch (error) {
-    console.error(`[funding] sendTakGift FAILED after ${Date.now() - started}ms: ${serializeError(error)}`);
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`TAK gift failed: ${detail}`);
-  }
-}
-
-export async function sendTakGift(params: SendTakGiftParams): Promise<unknown> {
-  const server = new Horizon.Server(params.horizonUrl);
-  server.httpClient.defaults.timeout = 15_000;
-  server.httpClient.defaults.maxRedirects = 10;
-  return submitTakGift(server, params);
 }

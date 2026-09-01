@@ -8,7 +8,11 @@ JWT_SECRET=change-me-to-a-long-random-string-at-least-32-chars
 # Testnet funding account. Create one, then fund it via Friendbot before local smoke tests:
 #   curl "https://friendbot.stellar.org?addr=<FUNDING_ACCOUNT_PUBLIC_KEY>"
 FUNDING_SECRET=S-REPLACE-WITH-TESTNET-FUNDING-ACCOUNT-SECRET
-TAK_ISSUER=G-REPLACE-WITH-FUNDING-ACCOUNT-PUBLIC-KEY
+# Classic TAK issuer (cafe-bazi's existing TAK issuing account). Code is the constant "TAK".
+TAK_ISSUER_PUBLIC_KEY=GD34LHPQRSZKJGTDSTAFHLTJ4AOS77JEAVMXVITLEI2XYCNSH64SIGRM
+# TAK is a SEP-41 Soroban token: balance is read from this contract via Soroban RPC.
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+TAK_CONTRACT_ID=CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C
 # First admin's Stellar public key. The account is promoted to admin at its first login.
 ADMIN_PUBLIC_KEY=G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY
 # Separate secret signing short-lived admin step-up JWTs. Random string of at least 32 chars.

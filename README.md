@@ -35,10 +35,12 @@ are installed as real directories.
 
 Before the testnet thin slice works, set `apps/web/.dev.vars` (see `.dev.vars.example`):
 
-- `FUNDING_SECRET` / `TAK_ISSUER` — a testnet funding account. Create one, then fund it via
+- `FUNDING_SECRET` — a testnet funding account. Create one, then fund it via
   Friendbot before smoke tests:
   `curl "https://friendbot.stellar.org?addr=<PUBLIC_KEY>"`
 - `JWT_SECRET` — random string of at least 32 chars.
+- `TAK_ISSUER_PUBLIC_KEY` — the classic TAK asset's issuer account (code `TAK`),
+  used for balance reads, trustlines, and payments.
 
 Then apply the D1 schema locally:
 
@@ -64,7 +66,6 @@ pnpm db:migrate    # apply to local D1
 ## Thin slice (testnet)
 
 The scaffold acceptance flow: signup → server funds the new account from the funding account →
-client establishes the TAK trustline (signed in a Web Worker, submitted to Horizon) → SEP-10
-login → balance read (XLM + TAK as stroop strings).
+SEP-10 login → balance read (XLM + TAK from Horizon as stroop strings).
 
 See `ARCHITECTURE.md` for the full design and `AGENTS.md` for contribution conventions.
