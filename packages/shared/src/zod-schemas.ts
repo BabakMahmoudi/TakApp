@@ -33,6 +33,27 @@ export const trustlineSchema = z.object({
   publicKey: stellarAccountIdSchema,
 });
 
+export const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(50),
+});
+
+export const userSearchSchema = z.object({
+  query: z.string().trim().min(1).max(60),
+});
+
+export const paymentRecordSchema = z
+  .object({
+    txHash: z.string().min(1).max(100),
+    amount: stroopsStringSchema,
+    asset: z.enum(['TAK', 'XLM']),
+    coffeeShopId: z.number().int().positive().optional(),
+    recipientPublicKey: stellarAccountIdSchema.optional(),
+  })
+  .refine(
+    (value) => (value.coffeeShopId !== undefined) !== (value.recipientPublicKey !== undefined),
+    { message: 'Exactly one of coffeeShopId or recipientPublicKey is required' },
+  );
+
 export const intentActionSchema = z.enum(['balance', 'shops', 'history']);
 
 export const intentSchema = z.discriminatedUnion('action', [
@@ -53,3 +74,6 @@ export const intentSchema = z.discriminatedUnion('action', [
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type BotIntent = z.infer<typeof intentSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type UserSearchInput = z.infer<typeof userSearchSchema>;
+export type PaymentRecordInput = z.infer<typeof paymentRecordSchema>;

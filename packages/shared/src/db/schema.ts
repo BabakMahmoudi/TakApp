@@ -8,6 +8,8 @@ export const users = sqliteTable('users', {
   displayName: text('display_name'),
   passwordHash: text('password_hash').notNull(),
   verificationState: text('verification_state').notNull().default('unverified'),
+  role: text('role').notNull().default('user'),
+  totpSecret: text('totp_secret'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
@@ -67,15 +69,37 @@ export const coffeeShops = sqliteTable('coffee_shops', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
+export const adminAuditLog = sqliteTable('admin_audit_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  action: text('action').notNull(),
+  target: text('target'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const adminStepUpAttempts = sqliteTable('admin_step_up_attempts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  failedAttempts: integer('failed_attempts').notNull().default(0),
+  lockedUntil: integer('locked_until', { mode: 'timestamp_ms' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
 export const payments = sqliteTable('payments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id')
     .notNull()
     .references(() => users.id),
   coffeeShopId: integer('coffee_shop_id').references(() => coffeeShops.id),
+  recipientPublicKey: text('recipient_public_key'),
   amount: text('amount').notNull(),
   asset: text('asset').notNull(),
-  txHash: text('tx_hash'),
+  txHash: text('tx_hash').unique(),
   status: text('status').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
@@ -95,3 +119,5 @@ export type Session = typeof sessions.$inferSelect;
 export type TelegramBinding = typeof telegramBindings.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type CoffeeShop = typeof coffeeShops.$inferSelect;
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type AdminStepUpAttempt = typeof adminStepUpAttempts.$inferSelect;

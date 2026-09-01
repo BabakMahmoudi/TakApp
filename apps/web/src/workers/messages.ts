@@ -9,6 +9,16 @@ export type StellarWorkerRequestPayload =
       assetIssuer: string;
       horizonUrl: string;
       networkPassphrase: string;
+    }
+  | {
+      type: 'submit-payment';
+      secretKey: string;
+      destination: string;
+      assetCode: string;
+      assetIssuer: string;
+      amount: string;
+      horizonUrl: string;
+      networkPassphrase: string;
     };
 
 export type StellarWorkerRequest = StellarWorkerRequestPayload & { requestId: string };

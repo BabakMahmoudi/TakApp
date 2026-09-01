@@ -9,3 +9,11 @@ JWT_SECRET=change-me-to-a-long-random-string-at-least-32-chars
 #   curl "https://friendbot.stellar.org?addr=<FUNDING_ACCOUNT_PUBLIC_KEY>"
 FUNDING_SECRET=S-REPLACE-WITH-TESTNET-FUNDING-ACCOUNT-SECRET
 TAK_ISSUER=G-REPLACE-WITH-FUNDING-ACCOUNT-PUBLIC-KEY
+# First admin's Stellar public key. The account is promoted to admin at its first login.
+ADMIN_PUBLIC_KEY=G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY
+# Separate secret signing short-lived admin step-up JWTs. Random string of at least 32 chars.
+ADMIN_JWT_SECRET=change-me-to-another-long-random-string-at-least-32-chars
+# AES-256-GCM key used to encrypt TOTP secrets at rest. Must be exactly 32 bytes.
+ADMIN_TOTP_ENC_KEY=change-me-to-a-32-byte-key-for-totp-encryption
+# Set to "false" to bypass the TOTP step-up and open the admin panel without an authenticator code.
+ADMIN_TOTP_REQUIRED=true

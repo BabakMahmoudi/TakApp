@@ -14,11 +14,22 @@ export interface SubmitChangeTrustInput {
   networkPassphrase: string;
 }
 
+export interface SubmitPaymentInput {
+  secretKey: string;
+  destination: string;
+  assetCode: string;
+  assetIssuer: string;
+  amount: string;
+  horizonUrl: string;
+  networkPassphrase: string;
+}
+
 export interface StellarWorkerClient {
   generateKeypair(): Promise<{ publicKey: string; secretKey: string }>;
   deriveFromMnemonic(mnemonic: string): Promise<{ publicKey: string; secretKey: string }>;
   signChallenge(input: SignChallengeInput): Promise<string>;
   submitChangeTrust(input: SubmitChangeTrustInput): Promise<string>;
+  submitPayment(input: SubmitPaymentInput): Promise<string>;
   terminate(): void;
 }
 
@@ -78,6 +89,11 @@ export function createStellarWorkerClient(): StellarWorkerClient {
     },
     async submitChangeTrust(input: SubmitChangeTrustInput) {
       const response = await send({ type: 'submit-change-trust', ...input });
+      if (response.type !== 'submitted') throw new Error('Unexpected worker response');
+      return response.txHash;
+    },
+    async submitPayment(input: SubmitPaymentInput) {
+      const response = await send({ type: 'submit-payment', ...input });
       if (response.type !== 'submitted') throw new Error('Unexpected worker response');
       return response.txHash;
     },

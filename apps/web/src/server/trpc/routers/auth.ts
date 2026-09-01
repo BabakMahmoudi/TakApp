@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { hashPassword } from '@takapp/shared/password';
 import { sessions, users } from '@takapp/shared/db';
 import { challengeSchema, loginSchema, signupSchema } from '@takapp/shared/zod-schemas';
+import { isBootstrapAdmin } from '../../admin/guards';
 import { d1Probe, logStep, serializeError } from '../../logging';
 import { fundNewAccount } from '../../stellar/funding';
 import { buildChallengeXdr, verifyChallengeXdr } from '../../stellar/sep10';
@@ -155,6 +156,9 @@ export const authRouter = router({
         });
       } catch {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid challenge signature' });
+      }
+      if (isBootstrapAdmin(user.stellarPublicKey, ctx.env.ADMIN_PUBLIC_KEY) && user.role !== 'admin') {
+        await ctx.db.update(users).set({ role: 'admin' }).where(eq(users.id, user.id));
       }
       const token = await issueSessionToken({
         secret: ctx.env.JWT_SECRET,

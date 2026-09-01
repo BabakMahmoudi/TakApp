@@ -1,6 +1,10 @@
-import { getSessionToken } from '../storage';
+import { getAdminToken, getSessionToken } from '../storage';
 
 export function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
   const token = getSessionToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const adminToken = getAdminToken();
+  if (adminToken) headers['x-admin-token'] = adminToken;
+  return headers;
 }

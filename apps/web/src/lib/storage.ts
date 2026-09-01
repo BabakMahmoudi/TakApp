@@ -3,6 +3,7 @@ const WALLET_STORE = 'wallet';
 const WALLET_RECORD_KEY = 'encrypted-secret';
 const SESSION_TOKEN_KEY = 'takapp.session.token';
 const SESSION_PUBLIC_KEY_KEY = 'takapp.session.publicKey';
+const ADMIN_TOKEN_KEY = 'takapp.session.adminToken';
 
 export interface WalletRecord {
   encryptedSecret: string;
@@ -74,4 +75,19 @@ export function clearSession(): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.removeItem(SESSION_TOKEN_KEY);
   localStorage.removeItem(SESSION_PUBLIC_KEY_KEY);
+}
+
+export function saveAdminToken(token: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
+export function getAdminToken(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function clearAdminToken(): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
