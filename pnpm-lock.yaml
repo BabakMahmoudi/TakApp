@@ -93,6 +93,9 @@ importers:
       '@serwist/next':
         specifier: ^9.0.0
         version: 9.5.12(next@15.5.24(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      '@stellar/stellar-base':
+        specifier: ^15.0.0
+        version: 15.0.0
       '@stellar/stellar-sdk':
         specifier: ^15.0.0
         version: 15.1.0
@@ -175,6 +178,9 @@ importers:
       typescript-eslint:
         specifier: ^8.0.0
         version: 8.68.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      undici:
+        specifier: ^7.0.0
+        version: 7.29.0
       vitest:
         specifier: ^4.0.0
         version: 4.1.11(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.16.9)(tsx@4.23.12)(yaml@2.9.0))

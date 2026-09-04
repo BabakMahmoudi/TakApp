@@ -7,8 +7,11 @@ export interface WorkerEnv {
   APP_DOMAIN: string;
   JWT_SECRET: string;
   FUNDING_SECRET: string;
-  TAK_ISSUER_PUBLIC_KEY: string;
   SOROBAN_RPC_URL: string;
+  /** Client-facing Horizon base; defaults to same-origin /api/stellar/horizon. */
+  HORIZON_PUBLIC_URL?: string;
+  /** Client-facing Soroban RPC base; defaults to same-origin /api/stellar/soroban. */
+  SOROBAN_PUBLIC_RPC_URL?: string;
   TAK_CONTRACT_ID: string;
   ADMIN_PUBLIC_KEY: string;
   ADMIN_JWT_SECRET: string;

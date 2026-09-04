@@ -24,7 +24,7 @@ function user(id: number, publicKey: string, displayName: string | null): User {
     email: `user${id}@example.com`,
     phone: null,
     displayName,
-    passwordHash: 'pbkdf2$SHA-256$i=600000$abc$def',
+    passwordHash: 'pbkdf2$SHA-256$i=100000$abc$def',
     verificationState: 'unverified',
     role: 'user',
     totpSecret: null,

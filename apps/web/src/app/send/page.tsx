@@ -57,7 +57,6 @@ export default function SendPage() {
       await submitPayment({
         secretKey,
         destination: recipient.publicKey,
-        amountLumens: sendAmount.trim(),
         stroops,
         recipientPublicKey: recipient.publicKey,
       });

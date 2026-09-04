@@ -1,11 +1,5 @@
-import {
-  Address,
-  Contract,
-  Horizon,
-  TransactionBuilder,
-  scValToNative,
-} from '@stellar/stellar-sdk/no-axios';
-import { Api as SorobanApi, Server as SorobanRpc } from '@stellar/stellar-sdk/no-axios/rpc';
+import { Address, Horizon, scValToNative, xdr } from '@stellar/stellar-sdk/no-axios';
+import { Durability, Server as SorobanRpc } from '@stellar/stellar-sdk/no-axios/rpc';
 import { stroopsFromLumens, stroopsFromTokenRaw } from '@takapp/shared/money';
 import type { BotEnv } from './env';
 
@@ -18,6 +12,13 @@ export interface BalanceEntry {
 
 export interface BalanceReader {
   readBalances(publicKey: string): Promise<BalanceEntry[]>;
+}
+
+function takBalanceKey(publicKey: string): xdr.ScVal {
+  return xdr.ScVal.scvVec([
+    xdr.ScVal.scvSymbol('Balance'),
+    new Address(publicKey).toScVal(),
+  ]);
 }
 
 export function createBalanceReader(env: BotEnv): BalanceReader {
@@ -33,29 +34,22 @@ export function createBalanceReader(env: BotEnv): BalanceReader {
         }
       }
 
-      const operation = new Contract(env.TAK_CONTRACT_ID).call(
-        'balance',
-        new Address(publicKey).toScVal(),
-      );
-      const transaction = new TransactionBuilder(account, {
-        fee: '100',
-        networkPassphrase: env.NETWORK_PASSPHRASE,
-      })
-        .addOperation(operation)
-        .setTimeout(0)
-        .build();
-      const simulation = await rpc.simulateTransaction(transaction);
-      if (SorobanApi.isSimulationError(simulation)) {
-        throw new Error(`TAK balance simulation failed: ${simulation.error}`);
+      let takStroops = '0';
+      try {
+        const data = await rpc.getContractData(
+          env.TAK_CONTRACT_ID,
+          takBalanceKey(publicKey),
+          Durability.Persistent,
+        );
+        const raw = scValToNative(data.val.contractData().val());
+        if (typeof raw === 'bigint') {
+          takStroops = stroopsFromTokenRaw(raw, TAK_DECIMALS);
+        }
+      } catch {
+        // TAK is best-effort: a fresh account has no Balance ledger entry and an
+        // RPC outage must not blank the XLM read, so both degrade to zero here.
       }
-      if (!simulation.result) {
-        throw new Error('TAK balance simulation returned no result');
-      }
-      const raw = scValToNative(simulation.result.retval);
-      if (typeof raw !== 'bigint') {
-        throw new Error(`Unexpected TAK balance return value: ${String(raw)}`);
-      }
-      entries.push({ asset: 'TAK', stroops: stroopsFromTokenRaw(raw, TAK_DECIMALS) });
+      entries.push({ asset: 'TAK', stroops: takStroops });
       return entries;
     },
   };

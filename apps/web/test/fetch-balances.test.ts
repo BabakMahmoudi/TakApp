@@ -8,7 +8,6 @@ import {
 
 const PUBLIC_KEY = 'GA3TUENLY64HLO5ED4W3IF2BVO4X5LCJTPBB77MYWR5QJSBR3CAXNR3V';
 const TAK_CONTRACT_ID = 'CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C';
-const NETWORK_PASSPHRASE = 'Test SDF Network ; September 2015';
 
 interface FakeAccount {
   accountId(): string;
@@ -37,18 +36,22 @@ function makeServer(account: FakeAccount): HorizonServer {
 
 function makeRpc(rawRetval: bigint): SorobanRpcServer {
   return {
-    simulateTransaction: async () => ({
-      result: { retval: nativeToScVal(rawRetval, { type: 'i128' }) },
+    getContractData: async () => ({
+      val: {
+        contractData: () => ({
+          val: () => nativeToScVal(rawRetval, { type: 'i128' }),
+        }),
+      },
     }),
   } as unknown as SorobanRpcServer;
 }
 
 describe('fetchBalances', () => {
-  it('reads 5000 TAK from the SEP-41 contract and native XLM for GA3TUEN…', async () => {
+  it('reads TAK from the SEP-41 Balance ledger entry and native XLM', async () => {
     const server = makeServer(makeAccount([{ asset_type: 'native', balance: '5' }]));
     const rpc = makeRpc(50_000_000_000n);
 
-    const balances = await fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID, NETWORK_PASSPHRASE);
+    const balances = await fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID);
 
     expect(balances).toEqual([
       { asset: 'XLM', stroops: '50000000' },
@@ -60,7 +63,7 @@ describe('fetchBalances', () => {
     const server = makeServer(makeAccount([{ asset_type: 'native', balance: '1' }]));
     const rpc = makeRpc(0n);
 
-    const balances = await fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID, NETWORK_PASSPHRASE);
+    const balances = await fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID);
 
     expect(balances).toEqual([
       { asset: 'XLM', stroops: '10000000' },
@@ -68,14 +71,19 @@ describe('fetchBalances', () => {
     ]);
   });
 
-  it('propagates a Soroban simulation error', async () => {
+  it('degrades TAK to zero (keeping XLM) when the RPC read fails', async () => {
     const server = makeServer(makeAccount([{ asset_type: 'native', balance: '1' }]));
     const rpc = {
-      simulateTransaction: async () => ({ error: 'boom' }),
+      getContractData: async () => {
+        throw new Error('not found');
+      },
     } as unknown as SorobanRpcServer;
 
-    await expect(
-      fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID, NETWORK_PASSPHRASE),
-    ).rejects.toThrow('TAK balance simulation failed: boom');
+    const balances = await fetchBalances(server, rpc, PUBLIC_KEY, TAK_CONTRACT_ID);
+
+    expect(balances).toEqual([
+      { asset: 'XLM', stroops: '10000000' },
+      { asset: 'TAK', stroops: '0' },
+    ]);
   });
 });

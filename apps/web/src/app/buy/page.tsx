@@ -32,7 +32,6 @@ export default function BuyPage() {
       await submitPayment({
         secretKey,
         destination: shop.ownerPublicKey as string,
-        amountLumens: '1',
         stroops: '10000000',
         coffeeShopId: shop.id,
       });

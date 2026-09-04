@@ -1,7 +1,10 @@
 import { sha256 } from '@noble/hashes/sha256';
 import { mnemonicToSeed, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { Asset, Horizon, Keypair, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Address, Contract, Keypair, nativeToScVal, TransactionBuilder } from '@stellar/stellar-base';
+import { Horizon } from '@stellar/stellar-sdk';
+import { Api as SorobanApi, Server as SorobanRpc, assembleTransaction } from '@stellar/stellar-sdk/rpc';
+import { isLocalHttpUrl } from '@takapp/shared/url';
 import type { StellarWorkerRequest, StellarWorkerResponse } from './messages';
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -22,8 +25,8 @@ function horizonErrorDetail(payload: unknown, raw: string): string {
   return raw.slice(0, 500);
 }
 
-function isValidLumenAmount(amount: string): boolean {
-  return /^[0-9]+(\.[0-9]{1,7})?$/.test(amount);
+function isValidStroopAmount(amount: string): boolean {
+  return /^[0-9]+$/.test(amount) && !/^0+$/.test(amount);
 }
 
 workerScope.onmessage = (event: MessageEvent<StellarWorkerRequest>) => {
@@ -74,55 +77,39 @@ async function handle(request: StellarWorkerRequest): Promise<void> {
         if (keypair.publicKey() === request.destination) {
           throw new Error('Cannot send a payment to yourself');
         }
-        if (!isValidLumenAmount(request.amount) || /^0+(\.0+)?$/.test(request.amount)) {
-          throw new Error('Payment amount must be greater than zero');
+        if (!isValidStroopAmount(request.amountRaw)) {
+          throw new Error('Payment amount must be a positive integer');
         }
-        const server = new Horizon.Server(request.horizonUrl);
-        server.httpClient.defaults.timeout = 15_000;
-        const account = await server.loadAccount(keypair.publicKey());
-        const operation = Operation.payment({
-          destination: request.destination,
-          asset: new Asset('TAK', request.assetIssuer),
-          amount: request.amount,
+        const server = new Horizon.Server(request.horizonUrl, {
+          allowHttp: isLocalHttpUrl(request.horizonUrl),
         });
-        const transaction = new TransactionBuilder(account, {
-          fee: '100',
-          networkPassphrase: request.networkPassphrase,
-        })
-          .addOperation(operation)
-          .setTimeout(180)
-          .build();
-        transaction.sign(keypair);
-        const txHash = await submitTransaction(request.horizonUrl, transaction.toXDR());
-        respond({ requestId: request.requestId, type: 'submitted', txHash });
-        break;
-      }
-      case 'ensure-trustline': {
-        const keypair = Keypair.fromSecret(request.secretKey);
-        const server = new Horizon.Server(request.horizonUrl);
         server.httpClient.defaults.timeout = 15_000;
+        const rpc = new SorobanRpc(request.rpcUrl, { allowHttp: isLocalHttpUrl(request.rpcUrl) });
         const account = await server.loadAccount(keypair.publicKey());
-        const hasTrustline = account.balances.some(
-          (balance) =>
-            balance.asset_type === 'credit_alphanum4' &&
-            balance.asset_code === 'TAK' &&
-            balance.asset_issuer === request.assetIssuer,
+        const operation = new Contract(request.contractId).call(
+          'transfer',
+          new Address(keypair.publicKey()).toScVal(),
+          new Address(request.destination).toScVal(),
+          nativeToScVal(BigInt(request.amountRaw), { type: 'i128' }),
         );
-        if (hasTrustline) {
-          respond({ requestId: request.requestId, type: 'trustline', txHash: null });
-          return;
-        }
-        const operation = Operation.changeTrust({ asset: new Asset('TAK', request.assetIssuer) });
         const transaction = new TransactionBuilder(account, {
           fee: '100',
           networkPassphrase: request.networkPassphrase,
         })
           .addOperation(operation)
-          .setTimeout(180)
+          .setTimeout(0)
           .build();
-        transaction.sign(keypair);
-        const txHash = await submitTransaction(request.horizonUrl, transaction.toXDR());
-        respond({ requestId: request.requestId, type: 'trustline', txHash });
+        const simulation = await rpc.simulateTransaction(transaction);
+        if (SorobanApi.isSimulationError(simulation)) {
+          throw new Error(`TAK transfer simulation failed: ${simulation.error}`);
+        }
+        if (!simulation.result) {
+          throw new Error('TAK transfer simulation returned no result');
+        }
+        const signed = assembleTransaction(transaction, simulation).build();
+        signed.sign(keypair);
+        const txHash = await submitTransaction(request.horizonUrl, signed.toXDR());
+        respond({ requestId: request.requestId, type: 'submitted', txHash });
         break;
       }
     }

@@ -24,7 +24,6 @@ export default function AuthFlow() {
   const challengeMutation = trpc.auth.challenge.useMutation();
   const loginMutation = trpc.auth.login.useMutation();
   const clientLogMutation = trpc.auth.clientLog.useMutation();
-  const networkConfigQuery = trpc.wallet.networkConfig.useQuery(undefined, { retry: false });
 
   function beacon(message: string): void {
     void clientLogMutation.mutateAsync({ message }).catch(() => undefined);
@@ -71,19 +70,6 @@ export default function AuthFlow() {
         password: credentials.password,
         publicKey: flow.publicKey,
       });
-      const config = networkConfigQuery.data;
-      if (config) {
-        try {
-          await worker().ensureTrustline({
-            secretKey: flow.secretKey,
-            assetIssuer: config.takAsset.issuer,
-            horizonUrl: config.horizonUrl,
-            networkPassphrase: config.networkPassphrase,
-          });
-        } catch (cause) {
-          beacon(`trustline: failed: ${cause instanceof Error ? cause.message : String(cause)}`);
-        }
-      }
       await runLogin(credentials.password, flow.publicKey);
     } catch (cause) {
       setError({ message: cause instanceof Error ? cause.message : String(cause) });

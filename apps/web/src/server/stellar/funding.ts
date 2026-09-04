@@ -6,6 +6,7 @@ import {
   TransactionBuilder,
   xdr,
 } from '@stellar/stellar-sdk/no-axios';
+import { isLocalHttpUrl } from '@takapp/shared/url';
 import { logHttp, serializeError } from '../logging';
 
 const SUBMIT_TRANSACTION_TIMEOUT_MS = 20_000;
@@ -111,7 +112,7 @@ export async function submitCreateAccount(server: FundingServer, params: FundNew
 }
 
 export async function fundNewAccount(params: FundNewAccountParams): Promise<unknown> {
-  const server = new Horizon.Server(params.horizonUrl);
+  const server = new Horizon.Server(params.horizonUrl, { allowHttp: isLocalHttpUrl(params.horizonUrl) });
   // Bail out fast instead of letting a stuck Horizon connection ride until the
   // Worker runtime cancels the whole request as hung. maxRedirects is set to
   // force the SDK's bounded fetch adapter, which actually honors `timeout`.

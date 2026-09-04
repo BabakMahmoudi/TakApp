@@ -12,7 +12,20 @@ database_id = "00000000-0000-0000-0000-000000000000"
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
 APP_DOMAIN = "takapp.dev"
-TAK_ISSUER_PUBLIC_KEY = "GD34LHPQRSZKJGTDSTAFHLTJ4AOS77JEAVMXVITLEI2XYCNSH64SIGRM"
 SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
 TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+[env.preview]
+name = "takapp-bot-preview"
+[env.preview.vars]
+HORIZON_URL = "https://horizon-testnet.stellar.org"
+NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
+SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
+TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
+APP_DOMAIN = "takapp.dev"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "takapp-d1-preview"
+database_id = "ccf200f7-d636-49b0-b63f-ddda3f00c989"

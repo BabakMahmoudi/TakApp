@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword } from '../src/password';
 describe('password hashing', () => {
   it('hashes and verifies a password', async () => {
     const encoded = await hashPassword('correct horse battery staple');
-    expect(encoded.startsWith('pbkdf2$SHA-256$i=600000$')).toBe(true);
+    expect(encoded.startsWith('pbkdf2$SHA-256$i=100000$')).toBe(true);
     await expect(verifyPassword('correct horse battery staple', encoded)).resolves.toBe(true);
   });
 

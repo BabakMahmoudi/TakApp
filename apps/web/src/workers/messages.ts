@@ -6,15 +6,9 @@ export type StellarWorkerRequestPayload =
       type: 'submit-payment';
       secretKey: string;
       destination: string;
-      amount: string;
-      assetIssuer: string;
-      horizonUrl: string;
-      networkPassphrase: string;
-    }
-  | {
-      type: 'ensure-trustline';
-      secretKey: string;
-      assetIssuer: string;
+      contractId: string;
+      amountRaw: string;
+      rpcUrl: string;
       horizonUrl: string;
       networkPassphrase: string;
     };
@@ -25,5 +19,4 @@ export type StellarWorkerResponse =
   | { requestId: string; type: 'keypair'; publicKey: string; secretKey: string }
   | { requestId: string; type: 'signed-xdr'; signedXdr: string }
   | { requestId: string; type: 'submitted'; txHash: string }
-  | { requestId: string; type: 'trustline'; txHash: string | null }
   | { requestId: string; type: 'error'; message: string };

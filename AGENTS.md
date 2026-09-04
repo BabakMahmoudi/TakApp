@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TakApp is a non-custodial wallet for the Stellar blockchain, delivered as a Progressive Web App (PWA). Users pay in the project's own token, **TAK** (a classic Stellar asset: code `TAK` plus issuer account, 7 decimals), to buy coffee in selected local coffee shops. The app also supports XLM.
+TakApp is a non-custodial wallet for the Stellar blockchain, delivered as a Progressive Web App (PWA). Users pay in the project's own token, **TAK** (a SEP-41 Soroban contract token, 7 decimals), to buy coffee in selected local coffee shops. The app also supports XLM.
 
 A companion **Telegram bot** gives users an LLM-driven, natural-language experience (e.g., "show my balance", "where can I pay?") powered by **DeepSeek** as the LLM. The bot is **read-only for v1**: balances, shop list, and history. Payment execution stays in the PWA until Telegram MiniApp work is scheduled.
 

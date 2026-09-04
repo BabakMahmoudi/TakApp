@@ -2,7 +2,7 @@
 
 ## Overview
 
-TakApp is a **non-custodial** mobile-first PWA that lets users pay for coffee with the project's own **TAK** token on the Stellar blockchain. TAK is a **classic Stellar asset** — code `TAK`, defined by an issuer account (7 decimals). Users hold and control their own Stellar keys; the backend never stores or sees secret keys and can never move user funds.
+TakApp is a **non-custodial** mobile-first PWA that lets users pay for coffee with the project's own **TAK** token on the Stellar blockchain. TAK is a **SEP-41 Soroban token** — contract `CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C`, 7 decimals. Users hold and control their own Stellar keys; the backend never stores or sees secret keys and can never move user funds.
 
 A companion **Telegram bot** lets users ask read-only questions conversationally — "show my balance", "where can I pay?" — with **DeepSeek** translating natural language into a restricted, validated command set. Payment execution stays in the PWA until Telegram MiniApp work is scheduled.
 
@@ -12,7 +12,7 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 
 - Let any user create a Stellar-backed wallet with only an email or phone number.
 - Make paying for coffee in local shops as simple as tapping a button.
-- Support **TAK** (a classic Stellar asset, code `TAK` + issuer) and **XLM** balances.
+- Support **TAK** (a SEP-41 Soroban token) and **XLM** balances.
 - Be fully functional offline for login, balance view, and payment flows.
 - Support email, SMS, and Google Authenticator verification.
 - Give admins the ability to manage coffee shops; support a "coffee shop owner" role.
@@ -38,7 +38,7 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 | Drizzle ORM | Lightweight, type-safe SQLite queries; schema doubles as the type source of truth. |
 | BIP-39 12-word mnemonic | Standard, interoperable recovery phrase; derived seed regenerates the Stellar keypair. |
 | Server-held funding account | Bounded zero-key exception: one secret (`FUNDING_SECRET`) funds new accounts with XLM; it can never sign user transactions, issue or move TAK, or touch user balances. |
-| Classic TAK asset (Stellar) | TAK is a classic Stellar asset defined by code `TAK` + an issuer account. Balances are read from the account's Horizon trustline; payments use `Operation.payment`; trustlines are accepted with `Operation.changeTrust`. |
+| SEP-41 TAK token (Soroban) | TAK is a SEP-41 Soroban token (contract ID + 7 decimals). Balances are read from the contract's `("Balance", address)` ledger entry via Soroban RPC `getContractData` (best-effort, degrades to `0`); payments invoke the contract's `transfer` function via simulate + assemble. |
 | Verification (TOTP first) | `otplib` TOTP implemented behind a pluggable `VerificationProvider` interface; email/SMS stubbed for v1. |
 | Telegram bot (grammY, webhook) | Meets users in Telegram; webhook mode suits Workers (no long polling); grammY's Cloudflare Workers adapter runs as a Worker `fetch` handler. |
 | DeepSeek via `openai` SDK | Cheap, capable natural-language parsing; `baseURL: https://api.deepseek.com`, model `deepseek-chat`; output is treated as untrusted and mapped to a restricted read-only command set. |
@@ -51,25 +51,29 @@ flowchart LR
   Next --> TRPC[tRPC server]
   TRPC --> D1[(Cloudflare D1<br/>SQLite)]
   Next --> HRZ[Horizon API<br/>Stellar]
+  Next --> SOROBAN[Soroban RPC<br/>SEP-41 TAK]
   Next --> SEP10[SEP-10 challenge/verify]
   Next --> Fund[Funding account<br/>createAccount (XLM)]
-  WebWorker[Signing Web Worker<br/>in browser] --> HRZ
-  WebWorker --> Next
+  WebWorker[Signing Web Worker<br/>in browser] --> Next
+  Next -.->|/api/stellar/* proxy| HRZ
+  Next -.->|/api/stellar/* proxy| SOROBAN
   Bot[Telegram] --> BotSvc[Telegram Bot grammY<br/>Cloudflare Worker]
   BotSvc --> DeepSeek[DeepSeek LLM]
   BotSvc --> D1
+  BotSvc --> SOROBAN
   Shared[packages/shared<br/>schema + zod + money] -.-> Next
   Shared -.-> BotSvc
 ```
 
 - **Client (PWA)**: Next.js app with service worker (`@serwist/next`); stores the encrypted secret key and recovery phrase locally (IndexedDB/localStorage, WebCrypto). Transaction signing runs in a dedicated Web Worker so signing never blocks the UI.
 - **tRPC server**: All communication (auth, wallet, coffee-shop, admin, users, payments) goes through tRPC procedures hosted in the Worker. `users` exposes profile read/edit and a display-name + public-key search; `payments.record` indexes client-submitted payments idempotently by tx hash.
+- **Stellar reverse proxy**: The payment flow's browser-side Stellar traffic (Horizon `loadAccount`, Soroban RPC `simulateTransaction`, Horizon `POST /transactions`) is routed same-origin through `/api/stellar/horizon/*` and `/api/stellar/soroban/*`. The Worker forwards those requests to `HORIZON_URL` / `SOROBAN_RPC_URL` from the edge, so the browser never talks to Stellar directly. `wallet.networkConfig` returns the proxy URLs unless `HORIZON_PUBLIC_URL` / `SOROBAN_PUBLIC_RPC_URL` override them.
 - **Telegram bot (grammY)**: A separate Cloudflare Worker receiving Telegram webhooks via grammY's `webhookCallback(..., 'cloudflare')`. It forwards user messages to DeepSeek, parses the result into a restricted **read-only** command set (balance, shops, history), and executes those commands against D1. There is no signing path in the bot.
 - **DeepSeek**: Natural-language intent parser. It is stateless and returns structured intent only (no free-form execution); prompts never receive secret keys or signed data.
 - **Funding account**: A single server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`, XLM) on signup. It never signs user transactions, never issues or moves TAK, and never touches user balances.
 - **packages/shared**: Drizzle schema, stroop money helpers, zod schemas, and verification providers shared by the web and bot workers; the schema is the single source of truth for DB types.
 - **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, coffee shops, payments, and gifts.
-- **Stellar (Horizon)**: Reads XLM/TAK balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding) — never for user accounts.
+- **Stellar (Horizon)**: Reads XLM balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding) — never for user accounts. TAK balances are read from the SEP-41 contract's `Balance` ledger entry via **Soroban RPC** `getContractData`; TAK transfers are simulated + assembled via **Soroban RPC** before client submission.
 
 ## Authentication & Key Management
 
@@ -79,8 +83,7 @@ flowchart LR
 2. Client derives an encryption key from the password (PBKDF2, high iteration count) and generates a Stellar keypair.
 3. The secret key is encrypted and stored in browser storage only. The 12-word mnemonic is shown once for recovery (never persisted server-side).
 4. The server creates a user row keyed by the Stellar **public key**; it never sees the secret.
-5. The server funds the new account from the funding account (`createAccount`, XLM).
-6. The client establishes the TAK trustline (`Operation.changeTrust`, signed in the Web Worker) so the account can hold the classic TAK asset. This is idempotent and fail-open: login proceeds even if it fails, and the trustline self-heals before the first TAK send.
+5. The server funds the new account from the funding account (`createAccount`, XLM). SEP-41 tokens need no trustline, so signup proceeds straight to login.
 
 ### Login (SEP-10)
 
@@ -136,10 +139,10 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 ### Pay for coffee / send TAK
 
 1. User selects a shop (fixed price 1 TAK, destination = the shop owner's Stellar account) or searches for another registered user by display name / public-key prefix and enters an amount.
-2. The client ensures the TAK trustline exists (no-op if present), then builds a classic `Operation.payment` transaction, signs it in the Web Worker with the decrypted key, and submits it to Horizon (the worker retries the same transaction XDR on transient network failures, so a retry is idempotent).
+2. The client builds a SEP-41 `transfer` invocation on the TAK contract, signs it in the Web Worker with the decrypted key, and submits it to Horizon. The worker first simulates the transaction via Soroban RPC (`simulateTransaction`), assembles the signed transaction with the simulated footprint/fees (`assembleTransaction`), then submits the XDR to Horizon (the worker retries the same XDR on transient network failures, so a retry is idempotent).
 3. The transaction is submitted to Horizon directly from the client; the server never signs or submits it.
 4. The client reports the tx hash to `payments.record`, which validates the destination (active shop with an owner, or an existing non-self user), stores the resolved `recipient_public_key`, and inserts a `status='submitted'` row idempotently by `tx_hash`. On-chain reconciliation of these trust-based records is future work.
-5. Balances are refetched (XLM and TAK both from Horizon) after a successful payment.
+5. Balances are refetched (XLM from Horizon and TAK from Soroban RPC) after a successful payment.
 
 ### Admin / owner
 
@@ -164,7 +167,7 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 - **Funding account (bounded exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It funds new accounts (`createAccount`, XLM) — nothing else. It can never sign user transactions, issue or move TAK, or touch user balances; the exception is documented and bounded in code.
 - **Trust-based payment indexing**: `payments.record` trusts the client-reported `tx_hash`. It is idempotent (unique constraint), but a malicious client could report a fabricated hash. On-chain reconciliation is accepted as future work for v1.
 - **SEP-10 challenge** is single-use, time-limited, and bound to the user's public key; tampered or replayed challenges are rejected (covered by tests).
-- **Password storage**: hashed with PBKDF2-HMAC-SHA256 (600k iterations, Web Crypto) on the server for the account password; the derived encryption key is salted/iterated PBKDF2 on the client.
+- **Password storage**: hashed with PBKDF2-HMAC-SHA256 (100k iterations, Web Crypto) on the server for the account password — capped at the workerd PBKDF2 maximum; the derived encryption key is salted/iterated PBKDF2 on the client.
 - **Rate limiting** on login, verification-code resend, challenge issuance, and TOTP step-up (5 failures then a 15-minute lockout per user via `admin_step_up_attempts`).
 - **Bot authorization**: read-only wallet queries from Telegram run only for users whose Telegram identity is bound and authorized; bindings can be revoked. The bot has no signing path.
 - **LLM as untrusted input**: DeepSeek output is parsed into a restricted, validated read-only command set; free-form LLM text can never drive privileged actions or reach the signing path.
@@ -193,7 +196,7 @@ Authenticated pages share a `WalletProvider` context (declared in `app/layout.ts
 - Both workers share `packages/shared` (schema, zod schemas, money helpers, verification providers).
 - D1 database with Drizzle migrations applied via `pnpm db:generate` / `pnpm db:migrate` (local first, remote explicitly).
 - PWA manifest + service worker (`@serwist/next`) generated at build time; core assets cached for offline use.
-- Environment variables hold Horizon URL, the TAK issuer public key, network passphrase (testnet in dev, public in prod), SEP-10 settings, `FUNDING_SECRET`, `BOT_TOKEN`, and `DEEPSEEK_API_KEY` — never user keys. Admin secrets: `ADMIN_PUBLIC_KEY` (public, in `[vars]`), plus `ADMIN_JWT_SECRET` and `ADMIN_TOTP_ENC_KEY` (deployed via `wrangler secrets`). `ADMIN_TOTP_REQUIRED` (optional, default on) toggles whether the admin TOTP step-up is enforced.
+- Environment variables hold Horizon URL, the TAK SEP-41 contract ID and Soroban RPC URL, network passphrase (testnet in dev, public in prod), SEP-10 settings, `FUNDING_SECRET`, `BOT_TOKEN`, and `DEEPSEEK_API_KEY` — never user keys. Admin secrets: `ADMIN_PUBLIC_KEY` (public, in `[vars]`), plus `ADMIN_JWT_SECRET` and `ADMIN_TOTP_ENC_KEY` (deployed via `wrangler secrets`). `ADMIN_TOTP_REQUIRED` (optional, default on) toggles whether the admin TOTP step-up is enforced. `HORIZON_PUBLIC_URL` / `SOROBAN_PUBLIC_RPC_URL` (optional) override the client-facing Stellar endpoints; otherwise the client uses the same-origin `/api/stellar/*` proxy. In local dev, `pnpm --filter @takapp/web dev:proxy` tunnels Stellar traffic through a forward proxy (`STELLAR_DEV_FORWARD_PROXY`, default `http://localhost:2352`).
 
 ## Testing Strategy
 

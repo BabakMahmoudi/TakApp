@@ -17,7 +17,24 @@ migrations_dir = "./drizzle"
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
 APP_DOMAIN = "takapp.dev"
-TAK_ISSUER_PUBLIC_KEY = "GD34LHPQRSZKJGTDSTAFHLTJ4AOS77JEAVMXVITLEI2XYCNSH64SIGRM"
 SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
 TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 ADMIN_PUBLIC_KEY = "G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY"
+# Optional: override the client-facing Stellar endpoints (default: same-origin /api/stellar/horizon|soroban)
+# HORIZON_PUBLIC_URL = ""
+# SOROBAN_PUBLIC_RPC_URL = ""
+
+[env.preview]
+name = "takapp-web-preview"
+[env.preview.vars]
+HORIZON_URL = "https://horizon-testnet.stellar.org"
+NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
+SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
+TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
+APP_DOMAIN = "takapp.dev"
+ADMIN_PUBLIC_KEY = "GCGXCQE7UE5RLKAN2SLJLWAGXWE4MR3VUUUOHBVWJOOA2HKUQTJGKV5P"
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "takapp-d1-preview"
+database_id = "ccf200f7-d636-49b0-b63f-ddda3f00c989"
+migrations_dir = "./drizzle"

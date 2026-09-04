@@ -8,11 +8,13 @@ JWT_SECRET=change-me-to-a-long-random-string-at-least-32-chars
 # Testnet funding account. Create one, then fund it via Friendbot before local smoke tests:
 #   curl "https://friendbot.stellar.org?addr=<FUNDING_ACCOUNT_PUBLIC_KEY>"
 FUNDING_SECRET=S-REPLACE-WITH-TESTNET-FUNDING-ACCOUNT-SECRET
-# Classic TAK issuer (cafe-bazi's existing TAK issuing account). Code is the constant "TAK".
-TAK_ISSUER_PUBLIC_KEY=GD34LHPQRSZKJGTDSTAFHLTJ4AOS77JEAVMXVITLEI2XYCNSH64SIGRM
-# TAK is a SEP-41 Soroban token: balance is read from this contract via Soroban RPC.
+# TAK is a SEP-41 Soroban token: balance and transfers go through this contract via Soroban RPC.
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 TAK_CONTRACT_ID=CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C
+# Optional: override the client-facing Stellar endpoints. When unset, the client uses the
+# same-origin proxy (/api/stellar/horizon|soroban), which the worker forwards to HORIZON_URL/SOROBAN_RPC_URL.
+# HORIZON_PUBLIC_URL=https://horizon-testnet.stellar.org
+# SOROBAN_PUBLIC_RPC_URL=https://soroban-testnet.stellar.org
 # First admin's Stellar public key. The account is promoted to admin at its first login.
 ADMIN_PUBLIC_KEY=G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY
 # Separate secret signing short-lived admin step-up JWTs. Random string of at least 32 chars.
@@ -21,3 +23,12 @@ ADMIN_JWT_SECRET=change-me-to-another-long-random-string-at-least-32-chars
 ADMIN_TOTP_ENC_KEY=change-me-to-a-32-byte-key-for-totp-encryption
 # Set to "false" to bypass the TOTP step-up and open the admin panel without an authenticator code.
 ADMIN_TOTP_REQUIRED=true
+# --- Local dev Stellar proxy (filtered regions) -------------------------------
+# To tunnel Stellar traffic through a forward proxy while developing, run the
+# `pnpm --filter @takapp/web dev:proxy` script alongside `pnpm dev`, then point
+# the worker's upstreams at the local proxy:
+#   HORIZON_URL=http://localhost:8788/horizon
+#   SOROBAN_RPC_URL=http://localhost:8788/soroban
+# The proxy tunnels outbound HTTPS through STELLAR_DEV_FORWARD_PROXY.
+# STELLAR_DEV_FORWARD_PROXY=http://localhost:2352
+# STELLAR_DEV_PROXY_PORT=8788

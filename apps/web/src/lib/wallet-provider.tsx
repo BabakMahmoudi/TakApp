@@ -3,7 +3,6 @@
 import type { TRPCClientErrorLike } from '@trpc/client';
 import type { UseTRPCQueryResult } from '@trpc/react-query/shared';
 import type { inferRouterOutputs } from '@trpc/server';
-import { lumensFromStroops } from '@takapp/shared/money';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { AppRouter } from '../server/trpc/router';
 import { createStellarWorkerClient } from '../workers/stellar-worker-client';
@@ -50,7 +49,6 @@ export function useStellarWorker(): () => StellarWorkerClient {
 export interface PaymentInput {
   secretKey: string;
   destination: string;
-  amountLumens: string;
   stroops: string;
   coffeeShopId?: number;
   recipientPublicKey?: string;
@@ -183,18 +181,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   async function submitPayment(input: PaymentInput): Promise<void> {
     const config = networkConfigQuery.data;
     if (!config) throw new Error('Network config not loaded');
-    await worker().ensureTrustline({
-      secretKey: input.secretKey,
-      assetIssuer: config.takAsset.issuer,
-      horizonUrl: config.horizonUrl,
-      networkPassphrase: config.networkPassphrase,
-    });
     const txHash = await withTimeout(
       worker().submitPayment({
         secretKey: input.secretKey,
         destination: input.destination,
-        amount: lumensFromStroops(input.stroops),
-        assetIssuer: config.takAsset.issuer,
+        contractId: config.takToken.contractId,
+        amountRaw: input.stroops,
+        rpcUrl: config.sorobanRpcUrl,
         horizonUrl: config.horizonUrl,
         networkPassphrase: config.networkPassphrase,
       }),

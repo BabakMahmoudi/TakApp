@@ -30,9 +30,45 @@ async function probeHorizon(horizonUrl: string) {
   }
 }
 
+async function probeSorobanRpc(rpcUrl: string) {
+  const started = Date.now();
+  try {
+    const res = await fetch(rpcUrl.replace(/\/+$/, ''), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = (await res.json()) as { result?: { status?: string } };
+    const healthy = res.ok && body.result?.status === 'healthy';
+    console.log(
+      `[diagnostics] soroban ${healthy ? 'ok' : `unhealthy status=${body.result?.status}`} http=${res.status} (${Date.now() - started}ms)`,
+    );
+    return {
+      sorobanRpcReachable: res.ok,
+      sorobanRpcHealthy: healthy,
+      status: res.status,
+      durationMs: Date.now() - started,
+      error: null as string | null,
+    };
+  } catch (error) {
+    console.error(`[diagnostics] soroban FAILED (${Date.now() - started}ms): ${serializeError(error)}`);
+    return {
+      sorobanRpcReachable: false,
+      sorobanRpcHealthy: false,
+      status: null as number | null,
+      durationMs: Date.now() - started,
+      error: serializeError(error),
+    };
+  }
+}
+
 async function runDiagnostics(env: WorkerEnv) {
-  const horizon = await probeHorizon(env.HORIZON_URL);
-  const d1 = await d1Probe(env.DB);
+  const [horizon, d1, soroban] = await Promise.all([
+    probeHorizon(env.HORIZON_URL),
+    d1Probe(env.DB),
+    probeSorobanRpc(env.SOROBAN_RPC_URL),
+  ]);
   return {
     horizonReachable: horizon.horizonReachable,
     horizonStatus: horizon.status,
@@ -40,6 +76,11 @@ async function runDiagnostics(env: WorkerEnv) {
     horizonError: horizon.error,
     d1Ok: d1.ok,
     d1DurationMs: d1.durationMs,
+    sorobanRpcReachable: soroban.sorobanRpcReachable,
+    sorobanRpcHealthy: soroban.sorobanRpcHealthy,
+    sorobanRpcStatus: soroban.status,
+    sorobanRpcDurationMs: soroban.durationMs,
+    sorobanRpcError: soroban.error,
   };
 }
 

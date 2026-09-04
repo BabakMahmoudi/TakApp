@@ -9,15 +9,9 @@ export interface SignChallengeInput {
 export interface SubmitPaymentInput {
   secretKey: string;
   destination: string;
-  amount: string;
-  assetIssuer: string;
-  horizonUrl: string;
-  networkPassphrase: string;
-}
-
-export interface EnsureTrustlineInput {
-  secretKey: string;
-  assetIssuer: string;
+  contractId: string;
+  amountRaw: string;
+  rpcUrl: string;
   horizonUrl: string;
   networkPassphrase: string;
 }
@@ -27,7 +21,6 @@ export interface StellarWorkerClient {
   deriveFromMnemonic(mnemonic: string): Promise<{ publicKey: string; secretKey: string }>;
   signChallenge(input: SignChallengeInput): Promise<string>;
   submitPayment(input: SubmitPaymentInput): Promise<string>;
-  ensureTrustline(input: EnsureTrustlineInput): Promise<string | null>;
   terminate(): void;
 }
 
@@ -88,11 +81,6 @@ export function createStellarWorkerClient(): StellarWorkerClient {
     async submitPayment(input: SubmitPaymentInput) {
       const response = await send({ type: 'submit-payment', ...input });
       if (response.type !== 'submitted') throw new Error('Unexpected worker response');
-      return response.txHash;
-    },
-    async ensureTrustline(input: EnsureTrustlineInput) {
-      const response = await send({ type: 'ensure-trustline', ...input });
-      if (response.type !== 'trustline') throw new Error('Unexpected worker response');
       return response.txHash;
     },
     terminate() {

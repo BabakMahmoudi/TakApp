@@ -3,10 +3,12 @@
 // Workers (workerd) embedder disallows, and pure-JS argon2 blocks the workerd
 // event loop (no async yielding) until the runtime kills the request.
 // PBKDF2-HMAC-SHA256 via crypto.subtle is native and non-blocking on Workers;
-// 600,000 iterations is the OWASP recommendation for PBKDF2-HMAC-SHA256.
+// 600,000 iterations is the OWASP recommendation for PBKDF2-HMAC-SHA256, but
+// the workerd embedder caps PBKDF2 at 100,000 iterations and throws otherwise,
+// so we use the runtime maximum.
 const PBKDF2 = {
   algorithm: 'SHA-256',
-  iterations: 600_000,
+  iterations: 100_000,
   saltLength: 16,
   keyLength: 32,
 } as const;
