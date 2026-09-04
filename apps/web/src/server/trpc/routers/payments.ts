@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { coffeeShops, payments, users } from '@takapp/shared/db';
+import { coffeeShops, menuItems, payments, users } from '@takapp/shared/db';
 import { paymentRecordSchema } from '@takapp/shared/zod-schemas';
 import { protectedProcedure, router } from '../trpc';
 
@@ -8,6 +8,7 @@ export const paymentsRouter = router({
   record: protectedProcedure.input(paymentRecordSchema).mutation(async ({ ctx, input }) => {
     let coffeeShopId: number | undefined;
     let recipientPublicKey: string;
+    let amount = input.amount;
 
     if (input.coffeeShopId !== undefined) {
       const [shop] = await ctx.db.select().from(coffeeShops).where(eq(coffeeShops.id, input.coffeeShopId)).limit(1);
@@ -23,6 +24,18 @@ export const paymentsRouter = router({
       }
       coffeeShopId = shop.id;
       recipientPublicKey = owner.stellarPublicKey;
+
+      if (input.menuItemId !== undefined) {
+        const [item] = await ctx.db
+          .select()
+          .from(menuItems)
+          .where(eq(menuItems.id, input.menuItemId))
+          .limit(1);
+        if (!item || item.coffeeShopId !== shop.id) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Menu item does not belong to this shop' });
+        }
+        amount = item.price;
+      }
     } else {
       const recipient = input.recipientPublicKey;
       if (!recipient) {
@@ -43,8 +56,9 @@ export const paymentsRouter = router({
       .values({
         userId: ctx.user.id,
         coffeeShopId: coffeeShopId ?? null,
+        menuItemId: input.menuItemId ?? null,
         recipientPublicKey,
-        amount: input.amount,
+        amount,
         asset: input.asset,
         txHash: input.txHash,
         status: 'submitted',

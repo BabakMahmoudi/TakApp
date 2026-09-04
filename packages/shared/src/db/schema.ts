@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -65,7 +65,21 @@ export const coffeeShops = sqliteTable('coffee_shops', {
   ownerUserId: integer('owner_user_id').references(() => users.id),
   name: text('name').notNull(),
   address: text('address'),
+  quoteOfTheDay: text('quote_of_the_day'),
+  latitude: real('latitude'),
+  longitude: real('longitude'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const menuItems = sqliteTable('menu_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  coffeeShopId: integer('coffee_shop_id')
+    .notNull()
+    .references(() => coffeeShops.id),
+  name: text('name').notNull(),
+  price: text('price').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
@@ -96,6 +110,7 @@ export const payments = sqliteTable('payments', {
     .notNull()
     .references(() => users.id),
   coffeeShopId: integer('coffee_shop_id').references(() => coffeeShops.id),
+  menuItemId: integer('menu_item_id').references(() => menuItems.id),
   recipientPublicKey: text('recipient_public_key'),
   amount: text('amount').notNull(),
   asset: text('asset').notNull(),
@@ -119,5 +134,6 @@ export type Session = typeof sessions.$inferSelect;
 export type TelegramBinding = typeof telegramBindings.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type CoffeeShop = typeof coffeeShops.$inferSelect;
+export type MenuItem = typeof menuItems.$inferSelect;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type AdminStepUpAttempt = typeof adminStepUpAttempts.$inferSelect;

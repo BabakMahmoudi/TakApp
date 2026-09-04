@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { isPositiveStroops, stroopsFromLumens } from '@takapp/shared/money';
+import { useI18n } from '../../lib/i18n';
 import { trpc } from '../../lib/trpc/trpc';
 import { useWallet } from '../../lib/wallet-provider';
 
 export default function SendPage() {
   const { session, busy, error, setError, signPayment, submitPayment } = useWallet();
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [recipient, setRecipient] = useState<{ publicKey: string; displayName: string | null } | null>(null);
@@ -26,9 +28,9 @@ export default function SendPage() {
   if (!session) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
-        <p className="text-coffee-300">Please log in</p>
+        <p className="text-coffee-300">{t('common.pleaseLogIn')}</p>
         <Link href="/" className="rounded-md bg-coffee-600 px-4 py-2.5 text-center font-medium text-coffee-50">
-          Go to login
+          {t('common.goToLogin')}
         </Link>
       </main>
     );
@@ -37,18 +39,18 @@ export default function SendPage() {
   async function sendTak(): Promise<void> {
     setError(null);
     if (!recipient) {
-      setError({ message: 'Search and select a recipient first' });
+      setError({ message: t('send.error.selectRecipient') });
       return;
     }
     if (session && recipient.publicKey === session.publicKey) {
-      setError({ message: 'Cannot send TAK to yourself' });
+      setError({ message: t('send.error.selfSend') });
       return;
     }
     let stroops: string;
     try {
       const trimmed = sendAmount.trim();
       stroops = stroopsFromLumens(trimmed);
-      if (!isPositiveStroops(stroops)) throw new Error('Amount must be greater than zero');
+      if (!isPositiveStroops(stroops)) throw new Error(t('send.error.amountPositive'));
     } catch (cause) {
       setError({ message: cause instanceof Error ? cause.message : String(cause) });
       return;
@@ -66,23 +68,23 @@ export default function SendPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
       <section className="rounded-xl bg-coffee-900 p-6 shadow">
-        <h2 className="text-sm font-medium text-coffee-300">Send TAK</h2>
+        <h2 className="text-sm font-medium text-coffee-300">{t('send.title')}</h2>
         <input
           value={searchQuery}
           onChange={(event) => {
             setSearchQuery(event.target.value);
             setRecipient(null);
           }}
-          placeholder="Search a user by name or address"
+          placeholder={t('send.searchPlaceholder')}
           className="mt-3 rounded-md border border-coffee-700 bg-coffee-950 px-3 py-2 text-coffee-100"
         />
         {recipient && (
           <p className="mt-2 text-xs text-coffee-300">
-            Sending to <span className="font-mono">{recipient.displayName ?? recipient.publicKey.slice(0, 12)}</span>
+            {t('send.sendingTo')} <span className="font-mono">{recipient.displayName ?? recipient.publicKey.slice(0, 12)}</span>
           </p>
         )}
         {!recipient && debouncedSearch.length > 0 && searchResultsQuery.data?.results.length === 0 && (
-          <p className="mt-2 text-xs text-coffee-400">No users found</p>
+          <p className="mt-2 text-xs text-coffee-400">{t('send.noUsersFound')}</p>
         )}
         {!recipient && (
           <ul className="mt-2 divide-y divide-coffee-800">
@@ -90,9 +92,9 @@ export default function SendPage() {
               <li key={result.publicKey}>
                 <button
                   onClick={() => setRecipient(result)}
-                  className="flex w-full items-center justify-between gap-2 py-2 text-left"
+                  className="flex w-full items-center justify-between gap-2 py-2 text-start"
                 >
-                  <span className="text-sm text-coffee-100">{result.displayName ?? 'Unnamed user'}</span>
+                  <span className="text-sm text-coffee-100">{result.displayName ?? t('send.unnamedUser')}</span>
                   <span className="font-mono text-xs text-coffee-400">{result.publicKey.slice(0, 12)}…</span>
                 </button>
               </li>
@@ -104,7 +106,7 @@ export default function SendPage() {
             value={sendAmount}
             onChange={(event) => setSendAmount(event.target.value)}
             inputMode="decimal"
-            placeholder="Amount in TAK"
+            placeholder={t('send.amountPlaceholder')}
             className="flex-1 rounded-md border border-coffee-700 bg-coffee-950 px-3 py-2 text-coffee-100"
           />
           <button
@@ -112,7 +114,7 @@ export default function SendPage() {
             disabled={busy || !recipient || sendAmount.trim().length === 0}
             className="rounded-md bg-coffee-600 px-4 py-2 text-sm font-medium text-coffee-50 disabled:opacity-50"
           >
-            Send
+            {t('send.send')}
           </button>
         </div>
       </section>

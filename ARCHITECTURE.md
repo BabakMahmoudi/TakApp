@@ -15,7 +15,7 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 - Support **TAK** (a SEP-41 Soroban token) and **XLM** balances.
 - Be fully functional offline for login, balance view, and payment flows.
 - Support email, SMS, and Google Authenticator verification.
-- Give admins the ability to manage coffee shops; support a "coffee shop owner" role.
+- Give admins the ability to manage coffee shops; let coffee shop owners manage their own shops (profile, quote, GPS, and TAK-priced menu) without a separate role.
 - Let users check balances, browse the shop list, and review history through a **read-only** Telegram bot assistant powered by natural language; payment execution stays in the PWA.
 
 ## Non-Goals
@@ -72,7 +72,7 @@ flowchart LR
 - **DeepSeek**: Natural-language intent parser. It is stateless and returns structured intent only (no free-form execution); prompts never receive secret keys or signed data.
 - **Funding account**: A single server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`, XLM) on signup. It never signs user transactions, never issues or moves TAK, and never touches user balances.
 - **packages/shared**: Drizzle schema, stroop money helpers, zod schemas, and verification providers shared by the web and bot workers; the schema is the single source of truth for DB types.
-- **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, coffee shops, payments, and gifts.
+- **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, coffee shops, menu items, payments, and gifts.
 - **Stellar (Horizon)**: Reads XLM balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding) — never for user accounts. TAK balances are read from the SEP-41 contract's `Balance` ledger entry via **Soroban RPC** `getContractData`; TAK transfers are simulated + assembled via **Soroban RPC** before client submission.
 
 ## Authentication & Key Management
@@ -120,8 +120,9 @@ flowchart LR
 - `verifications` — type (email/sms/totp), identifier, status, one-time code digest, expiry.
 - `telegram_bindings` — user id, telegram user id (unique), telegram username, bound/authorized at, last seen.
 - `conversations` — user id, telegram chat id, short-lived context window for bot replies (no secrets, expiry enforced).
-- `coffee_shops` — id, owner user id, name, address, active status, editable by admins.
-- `payments` — id, user id, coffee shop id (nullable), `recipient_public_key` (the actual on-chain destination for both shop and P2P payments, so history stays stable if names change), amount (string, stroops), asset (TAK/XLM), **unique tx hash**, status (`submitted`), timestamp. `payments.record` is idempotent on `tx_hash` so client retries after network failures never double-insert.
+- `coffee_shops` — id, owner user id, name, address, `quote_of_the_day`, `latitude`/`longitude` (SQLite `real`, GPS only — never money), active status. Editable by the owning user (via the `owner` router) and by admins.
+- `menu_items` — id, coffee shop id, name, `price` (string, stroops), `sort_order`, timestamp. The owner edits the whole menu in one atomic `db.batch` (delete + re-insert); customers pay the item's stored price.
+- `payments` — id, user id, coffee shop id (nullable), `menu_item_id` (nullable, set when a menu item is bought so history shows what was purchased), `recipient_public_key` (the actual on-chain destination for both shop and P2P payments, so history stays stable if names change), amount (string, stroops), asset (TAK/XLM), **unique tx hash**, status (`submitted`), timestamp. `payments.record` is idempotent on `tx_hash` so client retries after network failures never double-insert; when `menu_item_id` is present the stored amount is taken server-side from the menu item (server-authoritative), never trusted from the client.
 - `gifts` — retained for schema compatibility but no longer used (the welcome-gift flow was removed).
 - `admin_audit_log` — id, admin user id, action (`totp.enrolled`, `admin.login`, `promote`, `demote`, `shop.create`, `shop.update`, `shop.disable`), optional target, timestamp.
 - `admin_step_up_attempts` — one row per user tracking failed step-up attempts and the lockout timestamp.
@@ -138,10 +139,10 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 
 ### Pay for coffee / send TAK
 
-1. User selects a shop (fixed price 1 TAK, destination = the shop owner's Stellar account) or searches for another registered user by display name / public-key prefix and enters an amount.
+1. User opens Buy: the client lists active shops (with their menu, quote, and GPS), optionally sorts them by distance using browser `navigator.geolocation` + haversine (client-side only; no location is sent to the server, and the list degrades to a flat list offline/denied). The user picks a menu item (price in TAK) or, on the Send page, searches for another registered user and enters an amount.
 2. The client builds a SEP-41 `transfer` invocation on the TAK contract, signs it in the Web Worker with the decrypted key, and submits it to Horizon. The worker first simulates the transaction via Soroban RPC (`simulateTransaction`), assembles the signed transaction with the simulated footprint/fees (`assembleTransaction`), then submits the XDR to Horizon (the worker retries the same XDR on transient network failures, so a retry is idempotent).
 3. The transaction is submitted to Horizon directly from the client; the server never signs or submits it.
-4. The client reports the tx hash to `payments.record`, which validates the destination (active shop with an owner, or an existing non-self user), stores the resolved `recipient_public_key`, and inserts a `status='submitted'` row idempotently by `tx_hash`. On-chain reconciliation of these trust-based records is future work.
+4. The client reports the tx hash (plus `menuItemId` for a menu purchase) to `payments.record`, which validates the destination (active shop with an owner, or an existing non-self user), resolves the stored `recipient_public_key`, and for menu purchases takes the amount from the selected `menu_item` row (server-authoritative), then inserts a `status='submitted'` row idempotently by `tx_hash`. On-chain reconciliation of these trust-based records is future work.
 5. Balances are refetched (XLM from Horizon and TAK from Soroban RPC) after a successful payment.
 
 ### Admin / owner
@@ -149,7 +150,7 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 - The first admin is seeded by env (`ADMIN_PUBLIC_KEY`): the account is promoted to `role: 'admin'` at its first login, and the `adminProcedure` middleware also accepts the bootstrap key directly.
 - Admins log in with SEP-10 as usual, enroll a TOTP authenticator, and step up (6-digit code → short-lived admin JWT) before creating/editing/disabling coffee shops via tRPC admin procedures, or promoting/demoting users.
 - Admin tokens are stateless and never persisted: revocation is instant because every `adminProcedure` call reloads the user and re-checks `role`; the client discards the token on `UNAUTHORIZED`/`FORBIDDEN`.
-- Coffee shop owners manage their own shop(s) and view payment history (owner self-service is a later plan).
+- Coffee shop owners manage their own shop(s) through the **`owner` router** (`owner.mine`, `owner.update`, `owner.saveMenu`) authorized by the session token (`protectedProcedure`). Ownership is `coffee_shops.owner_user_id` — there is no `role='owner'`. The shared `assertCanEditShop` helper enforces that the caller is the shop's owner **or** an admin (`isAdminUser`), so admins can edit any shop via the same path. `saveMenuForShop` replaces a shop's menu atomically with `db.batch`.
 - Admin and owner permissions never grant access to user balances or keys.
 
 ### Conversational assistant (Telegram bot, read-only for v1)
@@ -181,13 +182,16 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 The PWA is split across real App Router routes instead of a single-screen shell:
 
 - `/` — logged out: `AuthFlow` (welcome/signup/mnemonic/login); logged in: `HomeDashboard` (merged address + balances panel, navigation buttons).
-- `/buy` — buy coffee: shops list, "Buy coffee (1 TAK)" per shop.
+- `/buy` — buy coffee: shops list (with menu items priced in TAK, Quote of the Day, and optional client-side proximity sort via geolocation); the user picks a menu item to pay its price.
 - `/send` — send TAK: recipient search + amount with stroop validation.
 - `/tak` — get TAK: informational entry pointing users to the testnet faucet / exchange.
 - `/profile` — profile: display-name editor plus read-only email/phone.
-- `/admin` — admin panel (TOTP step-up, shops/users management).
+- `/owner` — owner self-service: edit owned shops (name, address, quote, GPS) and their menu; shown only when the user owns ≥1 shop.
+- `/admin` — admin panel (TOTP step-up, shops/users management, including the new quote/GPS/menu fields).
 
-Authenticated pages share a `WalletProvider` context (declared in `app/layout.tsx` inside `TRPCProvider`). It owns the in-memory session + decrypted secret key, the global `busy`/`error` state, the password prompt overlay (a fixed-position modal so payments can be signed from any page), the shared `wallet.balance`/`wallet.networkConfig`/`admin.status` queries, and the `signPayment`/`submitPayment`/`logout`/`completeLogin` actions. A `NavBar` with a hamburger dropdown menu (Home / Buy Coffee / Send TAK / Get TAK / Profile / Admin Panel if admin / Log out; closes on navigation, outside click, and Escape) renders on all authenticated pages and is hidden while logged out. Admin gating everywhere (menu link, home button, admin panel) comes from the provider's single shared `adminStatusQuery`/`isAdmin`, backed by the server-side `isAdminUser` rule (`role === 'admin'` or bootstrap public-key match).
+Authenticated pages share a `WalletProvider` context (declared in `app/layout.tsx` inside `TRPCProvider`). It owns the in-memory session + decrypted secret key, the global `busy`/`error` state, the password prompt overlay (a fixed-position modal so payments can be signed from any page), the shared `wallet.balance`/`wallet.networkConfig`/`admin.status` queries, and the `signPayment`/`submitPayment`/`logout`/`completeLogin` actions. A `NavBar` with a hamburger dropdown menu (Home / Buy Coffee / Send TAK / Get TAK / Profile / My Shop if the user owns a shop / Admin Panel if admin / Log out; closes on navigation, outside click, and Escape) renders on all authenticated pages and is hidden while logged out. Admin gating everywhere (menu link, home button, admin panel) comes from the provider's single shared `adminStatusQuery`/`isAdmin`, backed by the server-side `isAdminUser` rule (`role === 'admin'` or bootstrap public-key match).
+
+The UI supports **English (`en`) and Persian (`fa`), defaulting to `fa`**, via a lightweight `I18nProvider` + typed `en`/`fa` dictionaries (`apps/web/src/lib/i18n`). The locale is switched on the Profile page and persisted in `localStorage`; `<html>` carries `lang`/`dir` (`rtl` for Persian, `ltr` for English) set by the provider, and direction-aware Tailwind utilities (`start`/`end`) keep RTL layout correct. Balance/amount display is localized with `Intl.NumberFormat` (Persian digits for `fa`) while underlying stroop strings stay unchanged.
 
 ## Deployment
 

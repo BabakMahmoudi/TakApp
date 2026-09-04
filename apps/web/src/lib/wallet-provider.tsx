@@ -8,6 +8,7 @@ import type { AppRouter } from '../server/trpc/router';
 import { createStellarWorkerClient } from '../workers/stellar-worker-client';
 import type { StellarWorkerClient } from '../workers/stellar-worker-client';
 import { decryptSecret, deriveEncryptionKey, fromBase64 } from './crypto';
+import { useI18n } from './i18n';
 import { clearAdminToken, clearSession, getSession, getWallet, saveSession } from './storage';
 import type { SessionRecord } from './storage';
 import { trpc } from './trpc/trpc';
@@ -51,6 +52,7 @@ export interface PaymentInput {
   destination: string;
   stroops: string;
   coffeeShopId?: number;
+  menuItemId?: number;
   recipientPublicKey?: string;
 }
 
@@ -84,6 +86,7 @@ export function useWallet(): WalletContextValue {
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [session, setSession] = useState<SessionRecord | null>(() => getSession());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage>(null);
@@ -152,7 +155,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setPasswordError(null);
     try {
       const wallet = await getWallet();
-      if (!wallet) throw new Error('No wallet found on this device');
+      if (!wallet) throw new Error(t('auth.error.noWallet'));
       const key = await deriveEncryptionKey(password, fromBase64(wallet.salt));
       const secretKey = await decryptSecret(key, wallet.iv, wallet.encryptedSecret);
       secretKeyRef.current = secretKey;
@@ -197,6 +200,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       txHash,
       amount: input.stroops,
       asset: 'TAK',
+      ...(input.menuItemId !== undefined ? { menuItemId: input.menuItemId } : {}),
       ...(input.coffeeShopId !== undefined
         ? { coffeeShopId: input.coffeeShopId }
         : { recipientPublicKey: input.recipientPublicKey }),
@@ -242,13 +246,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               void submitPaymentPassword(String(form.get('paymentPassword')));
             }}
           >
-            <p className="text-sm text-coffee-200">Enter your password to sign this payment.</p>
+            <p className="text-sm text-coffee-200">{t('payment.enterPassword')}</p>
             <div className="mt-2 flex gap-2">
               <input
                 name="paymentPassword"
                 type="password"
                 required
-                placeholder="Password"
+                placeholder={t('payment.password')}
                 className="flex-1 rounded-md border border-coffee-700 bg-coffee-900 px-3 py-2 text-coffee-100"
               />
               <button
@@ -256,14 +260,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                 disabled={busy}
                 className="rounded-md bg-coffee-600 px-4 py-2 text-sm font-medium text-coffee-50 disabled:opacity-50"
               >
-                Sign
+                {t('payment.sign')}
               </button>
               <button
                 type="button"
                 onClick={cancelPaymentPassword}
                 className="rounded-md border border-coffee-700 px-3 py-2 text-sm text-coffee-200"
               >
-                Cancel
+                {t('payment.cancel')}
               </button>
             </div>
             {passwordError && <p className="mt-2 text-sm text-red-400">{passwordError}</p>}

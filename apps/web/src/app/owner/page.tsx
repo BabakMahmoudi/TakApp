@@ -1,20 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import OwnerPanel from '../../components/owner-panel';
 import { useI18n } from '../../lib/i18n';
 import { useWallet } from '../../lib/wallet-provider';
 
-export default function TakPage() {
+export default function OwnerPage() {
   const { session } = useWallet();
   const { t } = useI18n();
-
-  const takMethods = [
-    {
-      id: 'faucet',
-      title: t('tak.faucetTitle'),
-      description: t('tak.faucetDescription'),
-    },
-  ] as const;
 
   if (!session) {
     return (
@@ -29,15 +22,8 @@ export default function TakPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
-      <h1 className="text-xl font-semibold text-coffee-100">{t('tak.title')}</h1>
-      <ul className="flex flex-col gap-4">
-        {takMethods.map((method) => (
-          <li key={method.id} className="rounded-xl bg-coffee-900 p-6 shadow">
-            <h2 className="text-sm font-medium text-coffee-300">{method.title}</h2>
-            <p className="mt-1 text-xs text-coffee-400">{method.description}</p>
-          </li>
-        ))}
-      </ul>
+      <h1 className="text-lg font-semibold text-coffee-100">{t('owner.title')}</h1>
+      <OwnerPanel />
     </main>
   );
 }

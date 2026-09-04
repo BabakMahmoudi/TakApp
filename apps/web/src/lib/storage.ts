@@ -1,9 +1,13 @@
+import { DEFAULT_LOCALE, isLocale } from './i18n/locale';
+import type { Locale } from './i18n/locale';
+
 const WALLET_DB_NAME = 'takapp';
 const WALLET_STORE = 'wallet';
 const WALLET_RECORD_KEY = 'encrypted-secret';
 const SESSION_TOKEN_KEY = 'takapp.session.token';
 const SESSION_PUBLIC_KEY_KEY = 'takapp.session.publicKey';
 const ADMIN_TOKEN_KEY = 'takapp.session.adminToken';
+export const LOCALE_KEY = 'takapp.locale';
 
 export interface WalletRecord {
   encryptedSecret: string;
@@ -90,4 +94,16 @@ export function getAdminToken(): string | null {
 export function clearAdminToken(): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+export function getLocale(): Locale {
+  if (typeof localStorage === 'undefined') return DEFAULT_LOCALE;
+  const stored = localStorage.getItem(LOCALE_KEY);
+  if (stored === null) return DEFAULT_LOCALE;
+  return isLocale(stored) ? stored : DEFAULT_LOCALE;
+}
+
+export function saveLocale(locale: Locale): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(LOCALE_KEY, locale);
 }

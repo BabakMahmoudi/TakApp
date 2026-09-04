@@ -10,6 +10,7 @@ vi.mock('drizzle-orm', async (importOriginal) => {
     eq: (column: unknown, value: unknown) => ({ kind: 'eq', column, value }),
     ne: (column: unknown, value: unknown) => ({ kind: 'ne', column, value }),
     like: (column: unknown, value: unknown) => ({ kind: 'like', column, value }),
+    inArray: (column: unknown, values: unknown[]) => ({ kind: 'inArray', column, values }),
     and: (...conds: unknown[]) => ({ kind: 'and', conds }),
     or: (...conds: unknown[]) => ({ kind: 'or', conds }),
   };
@@ -48,6 +49,12 @@ function makeDb(paymentsRows: Record<string, unknown>[] = []) {
         { id: 1, ownerUserId: 2, name: 'Cafe A', address: null, isActive: true, createdAt: new Date() },
         { id: 2, ownerUserId: null, name: 'No Owner', address: null, isActive: true, createdAt: new Date() },
         { id: 3, ownerUserId: 2, name: 'Closed', address: null, isActive: false, createdAt: new Date() },
+      ],
+    },
+    menu_items: {
+      rows: [
+        { id: 1, coffeeShopId: 1, name: 'Espresso', price: '5000000', sortOrder: 0, createdAt: new Date() },
+        { id: 2, coffeeShopId: 3, name: 'Latte', price: '7000000', sortOrder: 0, createdAt: new Date() },
       ],
     },
     payments: { rows: paymentsRows, unique: ['txHash'] },
@@ -175,6 +182,59 @@ describe('payments.record', () => {
     const second = await caller.payments.record(input);
     expect(first.id).toBe(second.id);
     expect(db.table('payments').rows).toHaveLength(1);
+  });
+
+  it('rejects a menuItemId without a coffeeShopId', async () => {
+    const db = makeDb();
+    const caller = await buildCaller(db, CALLER_KEY);
+    const code = await errorCode(
+      caller.payments.record({
+        txHash: 'h-menu-no-shop',
+        amount: '10000000',
+        asset: 'TAK',
+        menuItemId: 1,
+        recipientPublicKey: RECIPIENT_KEY,
+      }),
+    );
+    expect(code).toBe('BAD_REQUEST');
+  });
+
+  it('rejects a menuItemId that belongs to a different shop', async () => {
+    const db = makeDb();
+    const caller = await buildCaller(db, CALLER_KEY);
+    const code = await errorCode(
+      caller.payments.record({
+        txHash: 'h-menu-wrong-shop',
+        amount: '10000000',
+        asset: 'TAK',
+        coffeeShopId: 1,
+        menuItemId: 2,
+      }),
+    );
+    expect(code).toBe('BAD_REQUEST');
+  });
+
+  it('records the menu item price and menuItemId for a menu purchase', async () => {
+    const db = makeDb();
+    const caller = await buildCaller(db, CALLER_KEY);
+    const result = await caller.payments.record({
+      txHash: 'h-menu',
+      amount: '10000000',
+      asset: 'TAK',
+      coffeeShopId: 1,
+      menuItemId: 1,
+    });
+    expect(result).toEqual({ ok: true, id: 1 });
+    const rows = db.table('payments').rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      userId: 1,
+      coffeeShopId: 1,
+      menuItemId: 1,
+      recipientPublicKey: RECIPIENT_KEY,
+      amount: '5000000',
+      status: 'submitted',
+    });
   });
 });
 

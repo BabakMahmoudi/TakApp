@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { generateURI } from 'otplib';
 import { adminStepUpAttempts, coffeeShops, users } from '@takapp/shared/db';
 import { totpProvider } from '@takapp/shared/verification';
-import { stellarAccountIdSchema } from '@takapp/shared/zod-schemas';
+import { menuItemInputSchema, stellarAccountIdSchema } from '@takapp/shared/zod-schemas';
+import { attachMenus, saveMenuForShop } from '../../shop/service';
 import { logAdminAction } from '../../admin/audit';
 import { canDemote, canPromote, isAdminUser, isLocked, nextThrottleState, resetThrottle } from '../../admin/guards';
 import { verifyTotpCode } from '../../admin/totp';
@@ -23,6 +24,9 @@ function isTotpRequired(env: Pick<TrpcContext['env'], 'ADMIN_TOTP_REQUIRED'>): b
 const createShopInput = z.object({
   name: z.string().min(1).max(120),
   address: z.string().max(240).optional(),
+  quoteOfTheDay: z.string().max(240).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   ownerPublicKey: stellarAccountIdSchema.optional(),
 });
 
@@ -30,6 +34,9 @@ const updateShopInput = z.object({
   id: z.number().int().positive(),
   name: z.string().min(1).max(120).optional(),
   address: z.string().max(240).optional(),
+  quoteOfTheDay: z.string().max(240).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   isActive: z.boolean().optional(),
   ownerPublicKey: z.union([z.literal(''), stellarAccountIdSchema]).optional(),
 });
@@ -188,15 +195,8 @@ export const adminRouter = router({
       .select({ shop: coffeeShops, owner: users })
       .from(coffeeShops)
       .leftJoin(users, eq(coffeeShops.ownerUserId, users.id));
-    return {
-      shops: rows.map((row) => ({
-        id: row.shop.id,
-        name: row.shop.name,
-        address: row.shop.address,
-        isActive: row.shop.isActive,
-        ownerPublicKey: row.owner?.stellarPublicKey ?? null,
-      })),
-    };
+    const shops = await attachMenus(ctx.db, rows);
+    return { shops };
   }),
 
   createShop: adminProcedure.input(createShopInput).mutation(async ({ ctx, input }) => {
@@ -206,6 +206,9 @@ export const adminRouter = router({
       .values({
         name: input.name,
         address: input.address ?? null,
+        quoteOfTheDay: input.quoteOfTheDay ?? null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
         ownerUserId: ownerUserId ?? null,
         createdAt: new Date(),
       })
@@ -219,6 +222,9 @@ export const adminRouter = router({
         id: shop.id,
         name: shop.name,
         address: shop.address,
+        quoteOfTheDay: shop.quoteOfTheDay,
+        latitude: shop.latitude,
+        longitude: shop.longitude,
         isActive: shop.isActive,
         ownerPublicKey: input.ownerPublicKey ?? null,
       },
@@ -234,6 +240,11 @@ export const adminRouter = router({
     const updates: Partial<typeof coffeeShops.$inferInsert> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.address !== undefined) updates.address = input.address === '' ? null : input.address;
+    if (input.quoteOfTheDay !== undefined) {
+      updates.quoteOfTheDay = input.quoteOfTheDay === '' ? null : input.quoteOfTheDay;
+    }
+    if (input.latitude !== undefined) updates.latitude = input.latitude;
+    if (input.longitude !== undefined) updates.longitude = input.longitude;
     if (input.isActive !== undefined) updates.isActive = input.isActive;
     if (ownerUserId !== undefined) updates.ownerUserId = ownerUserId;
     await ctx.db.update(coffeeShops).set(updates).where(eq(coffeeShops.id, input.id));
@@ -250,6 +261,14 @@ export const adminRouter = router({
       }
       await ctx.db.update(coffeeShops).set({ isActive: false }).where(eq(coffeeShops.id, input.id));
       await logAdminAction(ctx.db, ctx.admin.id, 'shop.disable', String(input.id));
+      return { ok: true };
+    }),
+
+  saveMenu: adminProcedure
+    .input(z.object({ shopId: z.number().int().positive(), items: z.array(menuItemInputSchema) }))
+    .mutation(async ({ ctx, input }) => {
+      await saveMenuForShop(ctx.db, input.shopId, input.items);
+      await logAdminAction(ctx.db, ctx.admin.id, 'shop.saveMenu', String(input.shopId));
       return { ok: true };
     }),
 });

@@ -3,13 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../lib/i18n';
+import { trpc } from '../lib/trpc/trpc';
 import { useWallet } from '../lib/wallet-provider';
 
 export default function NavBar() {
   const { session, logout, isAdmin } = useWallet();
+  const { t } = useI18n();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
+  const mineQuery = trpc.owner.mine.useQuery(undefined, { enabled: !!session, retry: false });
+  const ownsShop = (mineQuery.data?.shops.length ?? 0) > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -34,13 +39,14 @@ export default function NavBar() {
   if (!session) return null;
 
   const links = [
-    { href: '/', label: 'Home' },
-    { href: '/wallet', label: 'Wallet' },
-    { href: '/buy', label: 'Buy Coffee' },
-    { href: '/send', label: 'Send TAK' },
-    { href: '/tak', label: 'Get TAK' },
-    { href: '/profile', label: 'Profile' },
-    ...(isAdmin ? [{ href: '/admin', label: 'Admin Panel' }] : []),
+    { href: '/', label: t('nav.home') },
+    { href: '/wallet', label: t('nav.wallet') },
+    { href: '/buy', label: t('nav.buyCoffee') },
+    { href: '/send', label: t('nav.sendTak') },
+    { href: '/tak', label: t('nav.getTak') },
+    { href: '/profile', label: t('nav.profile') },
+    ...(ownsShop ? [{ href: '/owner', label: t('nav.myShop') }] : []),
+    ...(isAdmin ? [{ href: '/admin', label: t('nav.adminPanel') }] : []),
   ];
 
   return (
@@ -50,7 +56,7 @@ export default function NavBar() {
       </Link>
       <button
         onClick={() => setOpen((current) => !current)}
-        aria-label="Menu"
+        aria-label={t('nav.menu')}
         aria-expanded={open}
         className="rounded-md border border-coffee-700 p-2 text-coffee-200"
       >
@@ -59,7 +65,7 @@ export default function NavBar() {
         </svg>
       </button>
       {open && (
-        <nav className="absolute right-6 top-full mt-2 w-48 rounded-xl border border-coffee-700 bg-coffee-950 p-2 shadow">
+        <nav className="absolute end-6 top-full mt-2 w-48 rounded-xl border border-coffee-700 bg-coffee-950 p-2 shadow">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -75,9 +81,9 @@ export default function NavBar() {
           ))}
           <button
             onClick={logout}
-            className="mt-1 block w-full rounded-md border border-coffee-700 px-3 py-2 text-left text-sm text-coffee-200"
+            className="mt-1 block w-full rounded-md border border-coffee-700 px-3 py-2 text-start text-sm text-coffee-200"
           >
-            Log out
+            {t('nav.logOut')}
           </button>
         </nav>
       )}

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { decryptSecret, deriveEncryptionKey, encryptSecret, fromBase64, generateSalt, toBase64 } from '../lib/crypto';
+import { useI18n } from '../lib/i18n';
 import { generateMnemonicPhrase, isValidMnemonicPhrase } from '../lib/recovery';
 import { getWallet, saveWallet } from '../lib/storage';
 import { trpc } from '../lib/trpc/trpc';
@@ -12,6 +13,7 @@ type ErrorMessage = { message: string } | null;
 
 export default function AuthFlow() {
   const { completeLogin } = useWallet();
+  const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>('welcome');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage>(null);
@@ -34,7 +36,7 @@ export default function AuthFlow() {
     setBusy(true);
     try {
       const mnemonic = generateMnemonicPhrase();
-      if (!isValidMnemonicPhrase(mnemonic)) throw new Error('Failed to generate a valid mnemonic');
+      if (!isValidMnemonicPhrase(mnemonic)) throw new Error(t('auth.error.mnemonic'));
       // Derive the keypair from the mnemonic so a future recovery from these
       // 12 words reproduces the exact same account that was registered.
       const { publicKey, secretKey } = await worker().deriveFromMnemonic(mnemonic);
@@ -83,7 +85,7 @@ export default function AuthFlow() {
     setBusy(true);
     try {
       const wallet = await getWallet();
-      if (!wallet) throw new Error('No wallet found on this device');
+      if (!wallet) throw new Error(t('auth.error.noWallet'));
       const publicKey = publicKeyOverride ?? wallet.publicKey;
       beacon(`login: start publicKey=${publicKey.slice(0, 6)}`);
       const challenge = await challengeMutation.mutateAsync({ publicKey });
@@ -114,9 +116,9 @@ export default function AuthFlow() {
     const words = flowRef.current?.mnemonic.split(' ') ?? [];
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
-        <h1 className="text-xl font-semibold text-coffee-200">Your recovery phrase</h1>
+        <h1 className="text-xl font-semibold text-coffee-200">{t('auth.recoveryTitle')}</h1>
         <p className="text-sm text-coffee-300">
-          Write these 12 words down and keep them safe. They can restore your wallet on any device.
+          {t('auth.recoveryBody')}
         </p>
         <ol className="grid grid-cols-2 gap-2">
           {words.map((word, index) => (
@@ -130,7 +132,7 @@ export default function AuthFlow() {
           disabled={busy}
           className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50 disabled:opacity-50"
         >
-          {busy ? 'Working…' : 'I saved it — continue'}
+          {busy ? t('auth.working') : t('auth.savedContinue')}
         </button>
       </main>
     );
@@ -140,7 +142,7 @@ export default function AuthFlow() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-coffee-100">TakApp</h1>
-        <p className="mt-1 text-coffee-300">Your coffee, on Stellar.</p>
+        <p className="mt-1 text-coffee-300">{t('auth.tagline')}</p>
       </div>
       {phase === 'welcome' && (
         <div className="flex flex-col gap-3">
@@ -151,7 +153,7 @@ export default function AuthFlow() {
             }}
             className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50"
           >
-            Create a wallet
+            {t('auth.createWallet')}
           </button>
           <button
             onClick={() => {
@@ -160,7 +162,7 @@ export default function AuthFlow() {
             }}
             className="rounded-md border border-coffee-700 px-4 py-2.5 font-medium text-coffee-200"
           >
-            Log in
+            {t('auth.logIn')}
           </button>
         </div>
       )}
@@ -177,7 +179,7 @@ export default function AuthFlow() {
             name="email"
             type="email"
             required
-            placeholder="Email"
+            placeholder={t('auth.email')}
             className="rounded-md border border-coffee-700 bg-coffee-900 px-3 py-2 text-coffee-100"
           />
           <input
@@ -185,7 +187,7 @@ export default function AuthFlow() {
             type="password"
             required
             minLength={8}
-            placeholder="Password (min 8 characters)"
+            placeholder={t('auth.passwordMin')}
             className="rounded-md border border-coffee-700 bg-coffee-900 px-3 py-2 text-coffee-100"
           />
           <button
@@ -193,7 +195,7 @@ export default function AuthFlow() {
             disabled={busy}
             className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50 disabled:opacity-50"
           >
-            {busy ? 'Creating…' : 'Create wallet'}
+            {busy ? t('auth.creating') : t('auth.createWallet')}
           </button>
         </form>
       )}
@@ -210,14 +212,14 @@ export default function AuthFlow() {
             name="email"
             type="email"
             required
-            placeholder="Email"
+            placeholder={t('auth.email')}
             className="rounded-md border border-coffee-700 bg-coffee-900 px-3 py-2 text-coffee-100"
           />
           <input
             name="password"
             type="password"
             required
-            placeholder="Password"
+            placeholder={t('auth.password')}
             className="rounded-md border border-coffee-700 bg-coffee-900 px-3 py-2 text-coffee-100"
           />
           <button
@@ -225,7 +227,7 @@ export default function AuthFlow() {
             disabled={busy}
             className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50 disabled:opacity-50"
           >
-            {busy ? 'Logging in…' : 'Log in'}
+            {busy ? t('auth.loggingIn') : t('auth.logIn')}
           </button>
         </form>
       )}

@@ -39,6 +39,7 @@ export function isZeroStroops(value: string): boolean {
 }
 
 export function isPositiveStroops(value: string): boolean {
+  if (!STROOPS_PATTERN.test(value)) return false;
   return parseStroops(value) > 0n;
 }
 

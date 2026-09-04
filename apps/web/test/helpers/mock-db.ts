@@ -5,6 +5,7 @@ export type MockCond =
   | { kind: 'eq'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'ne'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'like'; column: SQLiteTableColumn; value: string }
+  | { kind: 'inArray'; column: SQLiteTableColumn; values: unknown[] }
   | { kind: 'and'; conds: MockCond[] }
   | { kind: 'or'; conds: MockCond[] };
 
@@ -19,13 +20,21 @@ function dbColumnToRowKey(dbName: string): string {
   return dbName.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }
 
+function isColumn(value: unknown): value is SQLiteTableColumn {
+  return typeof value === 'object' && value !== null && typeof (value as SQLiteTableColumn).name === 'string';
+}
+
 function evalCond(cond: MockCond, row: Record<string, unknown>): boolean {
   const key = (column: SQLiteTableColumn): string => dbColumnToRowKey(column.name);
   switch (cond.kind) {
-    case 'eq':
-      return row[key(cond.column)] === cond.value;
-    case 'ne':
-      return row[key(cond.column)] !== cond.value;
+    case 'eq': {
+      const expected = isColumn(cond.value) ? row[key(cond.value)] : cond.value;
+      return row[key(cond.column)] === expected;
+    }
+    case 'ne': {
+      const expected = isColumn(cond.value) ? row[key(cond.value)] : cond.value;
+      return row[key(cond.column)] !== expected;
+    }
     case 'like': {
       const value = row[key(cond.column)];
       if (value === null || value === undefined) return false;
@@ -36,6 +45,8 @@ function evalCond(cond: MockCond, row: Record<string, unknown>): boolean {
       if (pattern.startsWith('%')) return text.endsWith(pattern.slice(1));
       return text === pattern;
     }
+    case 'inArray':
+      return cond.values.includes(row[key(cond.column)]);
     case 'and':
       return cond.conds.every((child) => evalCond(child, row));
     case 'or':
@@ -68,6 +79,14 @@ export class MockDb {
 
   delete(table: SQLiteTable) {
     return new DeleteQuery(this, getTableName(table));
+  }
+
+  async batch(queries: PromiseLike<unknown>[]): Promise<unknown[]> {
+    const results: unknown[] = [];
+    for (const query of queries) {
+      results.push(await query);
+    }
+    return results;
   }
 }
 

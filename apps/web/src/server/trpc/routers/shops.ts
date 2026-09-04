@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { coffeeShops, users } from '@takapp/shared/db';
+import { attachMenus } from '../../shop/service';
 import { publicProcedure, router } from '../trpc';
 
 export const shopsRouter = router({
@@ -9,13 +10,7 @@ export const shopsRouter = router({
       .from(coffeeShops)
       .leftJoin(users, eq(coffeeShops.ownerUserId, users.id))
       .where(eq(coffeeShops.isActive, true));
-    return {
-      shops: rows.map((row) => ({
-        id: row.shop.id,
-        name: row.shop.name,
-        address: row.shop.address,
-        ownerPublicKey: row.owner?.stellarPublicKey ?? null,
-      })),
-    };
+    const shops = await attachMenus(ctx.db, rows);
+    return { shops };
   }),
 });

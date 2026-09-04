@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+  <title id="title">TAK Coffee Token</title>
+  <desc id="desc">Circular brown TAK coffee token logo with a coffee cup and Since 1405 inscription.</desc>
+
+  <defs>
+    <radialGradient id="coin" cx="38%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#5a321b"/>
+      <stop offset="55%" stop-color="#3b1f11"/>
+      <stop offset="100%" stop-color="#1e0e07"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f1c28b"/>
+      <stop offset="50%" stop-color="#bd7a42"/>
+      <stop offset="100%" stop-color="#6d391d"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#120804" flood-opacity=".65"/>
+    </filter>
+  </defs>
+
+  <!-- Coin -->
+  <circle cx="500" cy="500" r="475" fill="url(#coin)"/>
+  <circle cx="500" cy="500" r="440" fill="none" stroke="url(#gold)" stroke-width="13"/>
+  <circle cx="500" cy="500" r="425" fill="none" stroke="#140804" stroke-width="3" opacity=".9"/>
+
+  <!-- Coffee cup -->
+  <g fill="url(#gold)" filter="url(#shadow)">
+    <path d="M365 315h270v28c0 87-53 139-135 139s-135-52-135-139z"/>
+    <path d="M635 342h38c54 0 83 35 83 78 0 45-36 82-94 82h-37v-34h32c31 0 55-22 55-48 0-24-15-44-42-44h-35z"/>
+    <path d="M340 475h320c-22 28-55 43-160 43s-138-15-160-43z"/>
+    <path d="M465 290c-35-35 22-58 22-94 0-13-4-25-11-35 28 17 40 43 25 70-13 24-43 38-36 59z"/>
+    <path d="M525 290c-35-35 22-58 22-94 0-13-4-25-11-35 28 17 40 43 25 70-13 24-43 38-36 59z"/>
+  </g>
+
+  <!-- TAK -->
+  <g fill="url(#gold)" filter="url(#shadow)">
+    <path d="M155 550h245l-20 42h-72v170h-60V592h-93z"/>
+    <path d="M470 550h58l120 212h-66l-27-52h-93l-27 52h-66zm39 72-27 52h54z"/>
+    <path d="M680 550h60v88l105-88h83L806 654l128 108h-85L740 669v93h-60z"/>
+  </g>
+
+  <!-- Decorative orbit -->
+  <g fill="none" stroke="url(#gold)" stroke-width="12" stroke-linecap="round">
+    <ellipse cx="500" cy="830" rx="58" ry="34" transform="rotate(-28 500 830)"/>
+    <path d="M430 855l142-76"/>
+    <path d="M340 830h85"/>
+    <path d="M575 830h85"/>
+  </g>
+
+  <!-- Bottom inscription -->
+  <text x="500" y="920" text-anchor="middle"
+        fill="url(#gold)"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="34"
+        font-weight="600"
+        letter-spacing="9">SINCE 1405</text>
+</svg>
