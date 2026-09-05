@@ -51,3 +51,14 @@ export async function fetchBalances(
   entries.push({ asset: 'TAK', stroops: takStroops });
   return entries;
 }
+
+export async function fetchTakBalance(
+  server: HorizonServer,
+  rpc: SorobanRpcServer,
+  publicKey: string,
+  takContractId: string,
+): Promise<string> {
+  const balances = await fetchBalances(server, rpc, publicKey, takContractId);
+  const tak = balances.find((entry) => entry.asset === 'TAK');
+  return tak?.stroops ?? '0';
+}

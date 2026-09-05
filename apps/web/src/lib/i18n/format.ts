@@ -7,3 +7,11 @@ export function formatAmount(locale: Locale, value: string): string {
     maximumFractionDigits: 7,
   }).format(number);
 }
+
+export function formatAmountLatin(value: string): string {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return value;
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 7,
+  }).format(number);
+}

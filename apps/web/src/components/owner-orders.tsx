@@ -5,6 +5,7 @@ import { lumensFromStroops } from '@takapp/shared/money';
 import { formatAmount, useI18n } from '../lib/i18n';
 import { useEnablePush } from '../lib/push';
 import { trpc } from '../lib/trpc/trpc';
+import TakSymbol from './tak-symbol';
 
 export default function OwnerOrders() {
   const { t, locale } = useI18n();
@@ -45,9 +46,10 @@ export default function OwnerOrders() {
                 <p className="text-xs text-coffee-400">
                   {order.customerDisplayName ?? order.customerPublicKey.slice(0, 12)}
                 </p>
-                <p className="mt-1 font-mono text-xs text-coffee-300">
-                  {formatAmount(locale, lumensFromStroops(order.totalAmount))} TAK ·{' '}
-                  {formatTime(order.createdAt)}
+                <p className="mt-1 flex items-center gap-1 font-mono text-xs text-coffee-300">
+                  <span>{formatAmount(locale, lumensFromStroops(order.totalAmount))}</span>
+                  <TakSymbol className="h-3.5 w-3.5" />
+                  <span>· {formatTime(order.createdAt)}</span>
                 </p>
               </div>
               {order.status === 'placed' ? (

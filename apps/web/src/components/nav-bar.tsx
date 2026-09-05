@@ -43,6 +43,7 @@ export default function NavBar() {
     { href: '/wallet', label: t('nav.wallet') },
     { href: '/buy', label: t('nav.buyCoffee') },
     { href: '/orders', label: t('nav.myOrders') },
+    { href: '/games', label: t('nav.games') },
     { href: '/send', label: t('nav.sendTak') },
     { href: '/tak', label: t('nav.getTak') },
     { href: '/profile', label: t('nav.profile') },

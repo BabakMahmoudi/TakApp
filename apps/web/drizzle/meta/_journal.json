@@ -36,6 +36,13 @@
       "when": 1788560493239,
       "tag": "0004_yummy_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788577747873,
+      "tag": "0005_regular_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

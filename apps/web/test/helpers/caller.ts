@@ -12,6 +12,7 @@ export const testEnv: WorkerEnv = {
   APP_DOMAIN: 'takapp.dev',
   JWT_SECRET: 'test-jwt-secret',
   FUNDING_SECRET: 'test-funding-secret',
+  GAME_ACCOUNT_SECRET: 'test-game-account-secret',
   SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
   TAK_CONTRACT_ID: 'CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C',
   ADMIN_PUBLIC_KEY: `G${'A'.repeat(55)}`,

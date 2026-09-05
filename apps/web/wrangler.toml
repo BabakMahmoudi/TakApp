@@ -23,6 +23,7 @@ ADMIN_PUBLIC_KEY = "G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY"
 VAPID_PUBLIC_KEY = "REPLACE-WITH-VAPID-PUBLIC-KEY"
 VAPID_SUBJECT = "mailto:admin@takapp.dev"
 # VAPID_PRIVATE_KEY is secret; set it with `wrangler secret put VAPID_PRIVATE_KEY`
+# GAME_ACCOUNT_SECRET is secret; set it with `wrangler secret put GAME_ACCOUNT_SECRET`
 # Optional: override the client-facing Stellar endpoints (default: same-origin /api/stellar/horizon|soroban)
 # HORIZON_PUBLIC_URL = ""
 # SOROBAN_PUBLIC_RPC_URL = ""

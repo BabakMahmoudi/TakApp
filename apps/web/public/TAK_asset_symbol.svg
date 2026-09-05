@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>TAK Asset Symbol</title>
+  <g fill="none" stroke="#7A3E16" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Euro-inspired open circular form -->
+    <path d="M390 112 C350 72 294 52 232 52 C130 52 52 130 52 232 C52 334 130 412 232 412 C294 412 350 392 390 352"/>
+    <!-- TAK symbol: T with two crossbars -->
+    <path d="M176 148 H336 M256 148 V364 M156 222 H356 M156 286 H356"/>
+  </g>
+</svg>

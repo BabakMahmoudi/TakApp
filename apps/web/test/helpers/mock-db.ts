@@ -6,8 +6,11 @@ export type MockCond =
   | { kind: 'ne'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'like'; column: SQLiteTableColumn; value: string }
   | { kind: 'inArray'; column: SQLiteTableColumn; values: unknown[] }
+  | { kind: 'gte'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'and'; conds: MockCond[] }
   | { kind: 'or'; conds: MockCond[] };
+
+export type MockOrderBy = { kind: 'asc' | 'desc'; column: SQLiteTableColumn };
 
 type SQLiteTableColumn = { name: string };
 
@@ -47,11 +50,23 @@ function evalCond(cond: MockCond, row: Record<string, unknown>): boolean {
     }
     case 'inArray':
       return cond.values.includes(row[key(cond.column)]);
+    case 'gte': {
+      const left = row[key(cond.column)];
+      const right = cond.value;
+      return orderCompare(left, right) >= 0;
+    }
     case 'and':
       return cond.conds.every((child) => evalCond(child, row));
     case 'or':
       return cond.conds.some((child) => evalCond(child, row));
   }
+}
+
+function orderCompare(a: unknown, b: unknown): number {
+  if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'string' && typeof b === 'string') return a < b ? -1 : a > b ? 1 : 0;
+  return 0;
 }
 
 export class MockDb {
@@ -94,6 +109,7 @@ class SelectQuery {
   private readonly joins: { name: string; on: MockCond }[] = [];
   private cond: MockCond | null = null;
   private limitN: number | null = null;
+  private order: MockOrderBy[] = [];
 
   constructor(
     private readonly db: MockDb,
@@ -108,6 +124,11 @@ class SelectQuery {
 
   where(cond: MockCond) {
     this.cond = cond;
+    return this;
+  }
+
+  orderBy(...clauses: MockOrderBy[]) {
+    this.order = clauses;
     return this;
   }
 
@@ -145,6 +166,16 @@ class SelectQuery {
     if (this.cond) {
       const cond = this.cond;
       rows = rows.filter((row) => evalCond(cond, this.flatten(row)));
+    }
+    if (this.order.length > 0) {
+      rows = [...rows].sort((left, right) => {
+        for (const clause of this.order) {
+          const key = dbColumnToRowKey(clause.column.name);
+          const cmp = orderCompare(left[key], right[key]);
+          if (cmp !== 0) return clause.kind === 'desc' ? -cmp : cmp;
+        }
+        return 0;
+      });
     }
     if (this.limitN !== null) rows = rows.slice(0, this.limitN);
     if (this.selection) return rows.map((row) => this.project(row));

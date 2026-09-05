@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -166,6 +166,40 @@ export const gifts = sqliteTable('gifts', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
+export const gameSettings = sqliteTable('game_settings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  gameKey: text('game_key').notNull().unique(),
+  settings: text('settings').notNull(),
+  updatedByUserId: integer('updated_by_user_id').references(() => users.id),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const gamePlays = sqliteTable(
+  'game_plays',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    gameKey: text('game_key').notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    playType: text('play_type').notNull().default('free'),
+    status: text('status').notNull(),
+    params: text('params').notNull(),
+    performance: text('performance'),
+    score: integer('score'),
+    prize: text('prize'),
+    payoutTxHash: text('payout_tx_hash'),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+    settledAt: integer('settled_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    userGameCreatedIdx: index('idx_game_plays_user_game_created').on(t.userId, t.gameKey, t.createdAt),
+    gameCreatedIdx: index('idx_game_plays_game_created').on(t.gameKey, t.createdAt),
+    statusIdx: index('idx_game_plays_status').on(t.status),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type TelegramBinding = typeof telegramBindings.$inferSelect;
@@ -177,3 +211,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type AdminStepUpAttempt = typeof adminStepUpAttempts.$inferSelect;
+export type GameSettingsRow = typeof gameSettings.$inferSelect;
+export type GamePlay = typeof gamePlays.$inferSelect;
+export type GamePlayStatus = GamePlay['status'];
+export type GamePlayType = GamePlay['playType'];

@@ -1,5 +1,6 @@
 import { adminRouter } from './routers/admin';
 import { authRouter } from './routers/auth';
+import { gamesRouter } from './routers/games';
 import { ordersRouter } from './routers/orders';
 import { ownerRouter } from './routers/owner';
 import { paymentsRouter } from './routers/payments';
@@ -15,6 +16,7 @@ export const appRouter = router({
   shops: shopsRouter,
   users: usersRouter,
   payments: paymentsRouter,
+  games: gamesRouter,
   admin: adminRouter,
   owner: ownerRouter,
   orders: ordersRouter,

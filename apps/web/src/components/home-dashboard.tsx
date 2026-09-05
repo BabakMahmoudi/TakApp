@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { lumensFromStroops } from '@takapp/shared/money';
-import { formatAmount, useI18n } from '../lib/i18n';
+import { formatAmountLatin, useI18n } from '../lib/i18n';
+import { trpc } from '../lib/trpc/trpc';
 import { useWallet } from '../lib/wallet-provider';
 import BuyCoffeeButton from './buy-coffee-button';
+import TakSymbol from './tak-symbol';
 
 export default function HomeDashboard() {
   const { session, balanceQuery, error, setError } = useWallet();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
+  const meQuery = trpc.users.me.useQuery(undefined, { enabled: !!session, retry: false });
 
   const [copied, setCopied] = useState(false);
 
@@ -29,16 +32,18 @@ export default function HomeDashboard() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
       <section className="rounded-xl bg-coffee-900 p-6 shadow">
-        <h2 className="text-sm font-medium text-coffee-300">{t('home.takBalance')}</h2>
-        <p className="mt-2 flex items-baseline gap-2">
+        <h2 className="text-sm font-medium text-coffee-300">
+          {meQuery.data?.displayName ?? session?.publicKey.slice(0, 12) ?? '—'}
+        </h2>
+        <p className="mt-2 flex items-center gap-2" dir="ltr">
           <span className="text-5xl font-bold text-coffee-100">
             {balanceQuery.isLoading
               ? '…'
               : balanceQuery.isError
                 ? '—'
-                : formatAmount(locale, lumensFromStroops(takBalance ? takBalance.stroops : '0'))}
+                : formatAmountLatin(lumensFromStroops(takBalance ? takBalance.stroops : '0'))}
           </span>
-          <span className="text-lg font-semibold text-coffee-300">TAK</span>
+          <TakSymbol className="h-14 w-14" />
         </p>
         <h2 className="mt-6 text-sm font-medium text-coffee-300">{t('home.address')}</h2>
         <code className="mt-2 block break-all font-mono text-xs text-coffee-100">{session?.publicKey}</code>
@@ -55,14 +60,16 @@ export default function HomeDashboard() {
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/send"
-            className="rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
+            className="flex items-center justify-center gap-2 rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
           >
+            <TakSymbol className="h-6 w-6" />
             {t('home.send')}
           </Link>
           <Link
             href="/tak"
-            className="rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
+            className="flex items-center justify-center gap-2 rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
           >
+            <TakSymbol className="h-6 w-6" />
             {t('home.get')}
           </Link>
         </div>

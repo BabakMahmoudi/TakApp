@@ -8,6 +8,7 @@ import { formatAmount, useI18n } from '../../../lib/i18n';
 import { useEnablePush } from '../../../lib/push';
 import { trpc } from '../../../lib/trpc/trpc';
 import { useWallet } from '../../../lib/wallet-provider';
+import TakSymbol from '../../../components/tak-symbol';
 
 const buttonClass = 'rounded-md bg-coffee-600 px-4 py-2 text-sm font-medium text-coffee-50 disabled:opacity-50';
 
@@ -99,8 +100,9 @@ export default function OrderPage() {
       <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
         <section className="rounded-xl bg-coffee-900 p-6 text-center shadow">
           <p className="text-lg font-semibold text-coffee-100">{t('order.confirmed')}</p>
-          <p className="mt-2 text-sm text-coffee-300">
-            {formatAmount(locale, lumensFromStroops(placed.totalAmount))} TAK
+          <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-coffee-300">
+            <span>{formatAmount(locale, lumensFromStroops(placed.totalAmount))}</span>
+            <TakSymbol className="h-4 w-4" />
           </p>
           <Link href="/orders" className="mt-4 inline-block rounded-md bg-coffee-600 px-4 py-2 text-sm font-medium text-coffee-50">
             {t('order.viewOrders')}
@@ -126,8 +128,9 @@ export default function OrderPage() {
               <div key={item.id} className="flex items-center justify-between gap-2 py-1">
                 <div>
                   <p className="text-sm text-coffee-100">{item.name}</p>
-                  <p className="font-mono text-xs text-coffee-400">
-                    {formatAmount(locale, lumensFromStroops(item.price))} TAK
+                  <p className="flex items-center gap-1 font-mono text-xs text-coffee-400">
+                    <span>{formatAmount(locale, lumensFromStroops(item.price))}</span>
+                    <TakSymbol className="h-3.5 w-3.5" />
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -157,8 +160,9 @@ export default function OrderPage() {
 
         <div className="mt-4 flex items-center justify-between border-t border-coffee-800 pt-3">
           <p className="text-sm text-coffee-300">{t('order.total')}</p>
-          <p className="font-mono text-lg font-semibold text-coffee-100">
-            {formatAmount(locale, lumensFromStroops(total))} TAK
+          <p className="flex items-center gap-1.5 font-mono text-lg font-semibold text-coffee-100">
+            <span>{formatAmount(locale, lumensFromStroops(total))}</span>
+            <TakSymbol className="h-5 w-5" />
           </p>
         </div>
 

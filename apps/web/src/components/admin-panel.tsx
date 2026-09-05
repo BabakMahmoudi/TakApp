@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { lumensFromStroops, stroopsFromLumens } from '@takapp/shared/money';
+import { CasinoTab, GamesTab } from './admin-games-panel';
 import { getCurrentPosition } from '../lib/geo';
 import { useI18n } from '../lib/i18n';
 import { clearAdminToken, getAdminToken, saveAdminToken } from '../lib/storage';
@@ -33,6 +34,11 @@ export default function AdminPanel() {
     setView('stepup');
   }, []);
 
+  const handleStepUpDone = useCallback((token: string): void => {
+    saveAdminToken(token);
+    setView('manage');
+  }, []);
+
   if (!adminStatusQuery.data) return null;
   if (!adminStatusQuery.data.isAdmin) {
     return <p className="text-sm text-red-400">{t('admin.notAuthorized')}</p>;
@@ -45,10 +51,7 @@ export default function AdminPanel() {
       {view === 'stepup' && (
         <StepUpView
           totpRequired={adminStatusQuery.data.totpRequired}
-          onDone={(token) => {
-            saveAdminToken(token);
-            setView('manage');
-          }}
+          onDone={handleStepUpDone}
           onAuthError={handleAuthError}
         />
       )}
@@ -133,6 +136,7 @@ function StepUpView({
   const stepUpMutation = trpc.admin.stepUp.useMutation();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const autoSubmittedRef = useRef(false);
 
   const submit = useCallback(
     async (value: string): Promise<void> => {
@@ -149,7 +153,9 @@ function StepUpView({
   );
 
   useEffect(() => {
-    if (!totpRequired) void submit('000000');
+    if (totpRequired || autoSubmittedRef.current) return;
+    autoSubmittedRef.current = true;
+    void submit('000000');
   }, [totpRequired, submit]);
 
   function handleSubmit(): void {
@@ -187,24 +193,35 @@ function StepUpView({
 
 function ManageView({ onAuthError }: { onAuthError: (error: unknown) => void }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<'shops' | 'users'>('shops');
+  const [tab, setTab] = useState<'shops' | 'users' | 'games' | 'casino'>('shops');
+  const tabs: { key: 'shops' | 'users' | 'games' | 'casino'; label: string }[] = [
+    { key: 'shops', label: t('admin.shops') },
+    { key: 'users', label: t('admin.users') },
+    { key: 'games', label: t('admin.games') },
+    { key: 'casino', label: t('admin.casino') },
+  ];
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
-        <button
-          onClick={() => setTab('shops')}
-          className={`rounded-md px-3 py-1.5 text-sm ${tab === 'shops' ? 'bg-coffee-600 text-coffee-50' : 'border border-coffee-700 text-coffee-200'}`}
-        >
-          {t('admin.shops')}
-        </button>
-        <button
-          onClick={() => setTab('users')}
-          className={`rounded-md px-3 py-1.5 text-sm ${tab === 'users' ? 'bg-coffee-600 text-coffee-50' : 'border border-coffee-700 text-coffee-200'}`}
-        >
-          {t('admin.users')}
-        </button>
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`rounded-md px-3 py-1.5 text-sm ${tab === item.key ? 'bg-coffee-600 text-coffee-50' : 'border border-coffee-700 text-coffee-200'}`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
-      {tab === 'shops' ? <ShopsTab onAuthError={onAuthError} /> : <UsersTab onAuthError={onAuthError} />}
+      {tab === 'shops' ? (
+        <ShopsTab onAuthError={onAuthError} />
+      ) : tab === 'users' ? (
+        <UsersTab onAuthError={onAuthError} />
+      ) : tab === 'games' ? (
+        <GamesTab onAuthError={onAuthError} />
+      ) : (
+        <CasinoTab onAuthError={onAuthError} />
+      )}
     </div>
   );
 }

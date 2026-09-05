@@ -7,6 +7,8 @@ export interface WorkerEnv {
   APP_DOMAIN: string;
   JWT_SECRET: string;
   FUNDING_SECRET: string;
+  /** Casino/house account that signs TAK game payouts to winners (and admin withdraws). Env-only. */
+  GAME_ACCOUNT_SECRET: string;
   SOROBAN_RPC_URL: string;
   /** Client-facing Horizon base; defaults to same-origin /api/stellar/horizon. */
   HORIZON_PUBLIC_URL?: string;

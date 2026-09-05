@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { lumensFromStroops } from '@takapp/shared/money';
 import { formatAmount, useI18n } from '../../lib/i18n';
 import { useWallet } from '../../lib/wallet-provider';
+import TakSymbol from '../../components/tak-symbol';
 
 export default function WalletPage() {
   const { session, balanceQuery } = useWallet();
@@ -34,7 +35,9 @@ export default function WalletPage() {
           <ul className="mt-2 divide-y divide-coffee-800">
             {balanceQuery.data?.balances.map((entry) => (
               <li key={entry.asset} className="flex items-center justify-between py-3">
-                <span className="text-coffee-300">{entry.asset}</span>
+                <span className="flex items-center gap-2 text-coffee-300">
+                  {entry.asset === 'TAK' ? <TakSymbol className="h-5 w-5" /> : entry.asset}
+                </span>
                 <span className="font-mono text-lg text-coffee-100">{formatAmount(locale, lumensFromStroops(entry.stroops))}</span>
               </li>
             ))}

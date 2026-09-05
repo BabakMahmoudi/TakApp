@@ -6,6 +6,15 @@ import { adminStepUpAttempts, coffeeShops, users } from '@takapp/shared/db';
 import { totpProvider } from '@takapp/shared/verification';
 import { menuItemInputSchema, stellarAccountIdSchema } from '@takapp/shared/zod-schemas';
 import { attachMenus, saveMenuForShop } from '../../shop/service';
+import {
+  getCasinoOverview,
+  listGamesForAdmin,
+  recentPlaysForAdmin,
+  retryPayoutForAdmin,
+  updateSettingsForAdmin,
+  withdrawFromCasino,
+  withGameErrors,
+} from '../../games/service';
 import { logAdminAction } from '../../admin/audit';
 import { canDemote, canPromote, isAdminUser, isLocked, nextThrottleState, resetThrottle } from '../../admin/guards';
 import { verifyTotpCode } from '../../admin/totp';
@@ -52,7 +61,58 @@ async function resolveOwnerUserId(
   return owner.id;
 }
 
+const adminGamesRouter = router({
+  list: adminProcedure.query(({ ctx }) =>
+    withGameErrors(() => listGamesForAdmin(ctx.db, ctx.env)),
+  ),
+
+  updateSettings: adminProcedure
+    .input(z.object({ gameKey: z.string().min(1), settings: z.unknown() }))
+    .mutation(({ ctx, input }) =>
+      withGameErrors(() =>
+        updateSettingsForAdmin(ctx.db, {
+          actorUserId: ctx.admin.id,
+          gameKey: input.gameKey,
+          settings: input.settings,
+        }),
+      ),
+    ),
+
+  recentPlays: adminProcedure
+    .input(z.object({ gameKey: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }))
+    .query(({ ctx, input }) =>
+      withGameErrors(() => recentPlaysForAdmin(ctx.db, { gameKey: input.gameKey, limit: input.limit })),
+    ),
+
+  retryPayout: adminProcedure
+    .input(z.object({ playId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) =>
+      withGameErrors(() =>
+        retryPayoutForAdmin(ctx.db, ctx.env, { actorUserId: ctx.admin.id, playId: input.playId }),
+      ),
+    ),
+});
+
+const adminCasinoRouter = router({
+  get: adminProcedure.query(({ ctx }) => withGameErrors(() => getCasinoOverview(ctx.env))),
+
+  withdraw: adminProcedure
+    .input(z.object({ amount: z.string().regex(/^\d+$/), destination: z.string().min(1) }))
+    .mutation(({ ctx, input }) =>
+      withGameErrors(() =>
+        withdrawFromCasino(ctx.db, ctx.env, {
+          actorUserId: ctx.admin.id,
+          amount: input.amount,
+          destination: input.destination,
+        }),
+      ),
+    ),
+});
+
 export const adminRouter = router({
+  games: adminGamesRouter,
+  casino: adminCasinoRouter,
+
   status: protectedProcedure.query(async ({ ctx }) => ({
     role: isAdminUser(ctx.user, ctx.env.ADMIN_PUBLIC_KEY) ? 'admin' : ctx.user.role,
     isAdmin: isAdminUser(ctx.user, ctx.env.ADMIN_PUBLIC_KEY),
