@@ -7,6 +7,7 @@ const WALLET_RECORD_KEY = 'encrypted-secret';
 const SESSION_TOKEN_KEY = 'takapp.session.token';
 const SESSION_PUBLIC_KEY_KEY = 'takapp.session.publicKey';
 const ADMIN_TOKEN_KEY = 'takapp.session.adminToken';
+const ANONYMOUS_KEY = 'takapp.anonymousKey';
 export const LOCALE_KEY = 'takapp.locale';
 
 export interface WalletRecord {
@@ -94,6 +95,15 @@ export function getAdminToken(): string | null {
 export function clearAdminToken(): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+export function getAnonymousKey(): string {
+  if (typeof localStorage === 'undefined') return '';
+  const existing = localStorage.getItem(ANONYMOUS_KEY);
+  if (existing) return existing;
+  const key = crypto.randomUUID();
+  localStorage.setItem(ANONYMOUS_KEY, key);
+  return key;
 }
 
 export function getLocale(): Locale {

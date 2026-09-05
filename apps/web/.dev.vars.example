@@ -8,10 +8,11 @@ JWT_SECRET=change-me-to-a-long-random-string-at-least-32-chars
 # Testnet funding account. Create one, then fund it via Friendbot before local smoke tests:
 #   curl "https://friendbot.stellar.org?addr=<FUNDING_ACCOUNT_PUBLIC_KEY>"
 FUNDING_SECRET=S-REPLACE-WITH-TESTNET-FUNDING-ACCOUNT-SECRET
-# Casino/house account for games. A second server-held Stellar key that signs ONLY
-# `casino -> winner` TAK payouts (and admin casino withdraws). Generate a keypair, fund
-# it with XLM (Friendbot) and TAK (the faucet/exchange referenced on /tak), then paste
-# the S-key here. Without a TAK-funded casino every game `start` fails with GAME_OUT_OF_FUNDS.
+# Casino/house account for games and the one-time claim faucet. A second server-held
+# Stellar key that signs `casino -> winner` TAK payouts, admin casino withdraws, and the
+# one-time 3-TAK claim on /tak. Generate a keypair, fund it with XLM (Friendbot) and TAK,
+# then paste the S-key here. Without a TAK-funded casino every game `start` fails with
+# GAME_OUT_OF_FUNDS and every /tak claim fails with FAUCET_OUT_OF_FUNDS.
 GAME_ACCOUNT_SECRET=S-REPLACE-WITH-CASINO-ACCOUNT-SECRET
 # TAK is a SEP-41 Soroban token: balance and transfers go through this contract via Soroban RPC.
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
@@ -24,6 +25,9 @@ TAK_CONTRACT_ID=CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C
 ADMIN_PUBLIC_KEY=G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY
 # Separate secret signing short-lived admin step-up JWTs. Random string of at least 32 chars.
 ADMIN_JWT_SECRET=change-me-to-another-long-random-string-at-least-32-chars
+# Shared secret with the takapp-agents worker (same value in apps/agents/.dev.vars).
+# The web worker sends it as `x-agent-internal-token` over the service binding.
+AGENTS_INTERNAL_TOKEN=change-me-to-a-long-random-token-shared-with-agents-worker
 # AES-256-GCM key used to encrypt TOTP secrets at rest. Must be exactly 32 bytes.
 ADMIN_TOTP_ENC_KEY=change-me-to-a-32-byte-key-for-totp-encryption
 # Set to "false" to bypass the TOTP step-up and open the admin panel without an authenticator code.

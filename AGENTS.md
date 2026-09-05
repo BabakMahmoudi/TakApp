@@ -89,7 +89,7 @@ packages/
 ## Important Constraints
 
 - **Non-custodial**: the server can never move user funds. It holds no user secret keys. Admin operations never touch user balances.
-- **Funding account (bounded zero-key exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It is used only to fund new accounts (`createAccount`, XLM). It can never sign user transactions, issue or move TAK, or touch user balances.
+- **Funding account (bounded zero-key exception)**: the server holds two bounded Stellar secret keys (env only). `FUNDING_SECRET` funds new accounts (`createAccount`, XLM) and never moves TAK. `GAME_ACCOUNT_SECRET` is the bounded TAK-signing key: game prizes, admin withdraws, and the one-time 3-TAK claim faucet. Neither can sign user transactions or touch user balances.
 - **SEP-10 auth**: authentication must follow Stellar SEP-10 (challenge/response). Users sign challenges locally with their decrypted key; the server verifies signatures and issues a signed token.
 - **Cloudflare D1 limitations**: SQLite-based; keep transactions short, batch writes, and be aware of D1's per-request write limits.
 - **Cloudflare compatibility**: Next server code must avoid Node-only APIs; verify native modules (`argon2`) and edge crypto (`jose`, Stellar SDK) work on Workers. Server-side password hashing uses Web Crypto PBKDF2-SHA256 (native on Workers); do not reintroduce hash-wasm/WASM-compiled KDFs (workerd disallows runtime WASM compilation and pure-JS argon2 blocks the event loop).

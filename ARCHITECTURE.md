@@ -6,7 +6,9 @@ TakApp is a **non-custodial** mobile-first PWA that lets users pay for coffee wi
 
 A companion **Telegram bot** lets users ask read-only questions conversationally — "show my balance", "where can I pay?" — with **DeepSeek** translating natural language into a restricted, validated command set. Payment execution stays in the PWA until Telegram MiniApp work is scheduled.
 
-The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed through OpenNext, with **Cloudflare D1** (SQLite) as the database, **Drizzle** as the ORM, and **tRPC** as the sole client-server communication layer. The repo is a pnpm-workspaces monorepo: `apps/web` (PWA), `apps/bot` (Telegram bot), and `packages/shared` (Drizzle schema, zod schemas, money helpers, verification providers shared by both workers).
+The PWA also embeds a chat-based **AI agent** ("TakAppAgent") that answers questions about TakApp, the TAK token, and coffee. It runs as a separate Cloudflare Worker (`apps/agents`) on the **Cloudflare Agents SDK** (Durable Objects + SQLite memory), streams responses over SSE through a same-origin proxy in `apps/web`, and uses the same DeepSeek model. Personalized tools (balance, order history) require the existing SEP-10 session; anonymous general Q&A is allowed.
+
+The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed through OpenNext, with **Cloudflare D1** (SQLite) as the database, **Drizzle** as the ORM, and **tRPC** as the sole client-server communication layer. The repo is a pnpm-workspaces monorepo: `apps/web` (PWA), `apps/bot` (Telegram bot), `apps/agents` (in-app conversational agent), and `packages/shared` (Drizzle schema, zod schemas, money helpers, stellar readers, verification providers shared by all workers).
 
 ## Goals
 
@@ -21,7 +23,7 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 ## Non-Goals
 
 - Custodial storage of user funds or keys.
-- Server-side signing of user transactions (the server never touches user balances; the only exception is the bounded funding account, which funds new accounts with XLM).
+- Server-side signing of user transactions (the server never touches user balances; the only exceptions are the bounded funding account, which funds new accounts with XLM, and the bounded casino/faucet account, which signs its own TAK payouts, withdraws, and claims).
 - Support for other blockchains.
 
 ## Technology Decisions
@@ -37,11 +39,12 @@ The app runs on **Cloudflare Workers** using Next.js 15 (App Router) deployed th
 | Tailwind CSS v4 | Utility-first styling with a PostCSS plugin (`@tailwindcss/postcss`); coffee-themed base palette. |
 | Drizzle ORM | Lightweight, type-safe SQLite queries; schema doubles as the type source of truth. |
 | BIP-39 12-word mnemonic | Standard, interoperable recovery phrase; derived seed regenerates the Stellar keypair. |
-| Server-held funding account | Bounded zero-key exception: one secret (`FUNDING_SECRET`) funds new accounts with XLM; it can never sign user transactions, issue or move TAK, or touch user balances. |
+| Server-held keys (bounded exceptions) | Two bounded server-held secrets: `FUNDING_SECRET` funds new accounts with XLM only, and `GAME_ACCOUNT_SECRET` signs the casino's own TAK payouts/withdraws and the one-time claim faucet. Neither can sign user transactions or touch user balances. |
 | SEP-41 TAK token (Soroban) | TAK is a SEP-41 Soroban token (contract ID + 7 decimals). Balances are read from the contract's `("Balance", address)` ledger entry via Soroban RPC `getContractData` (best-effort, degrades to `0`); payments invoke the contract's `transfer` function via simulate + assemble. |
 | Verification (TOTP first) | `otplib` TOTP implemented behind a pluggable `VerificationProvider` interface; email/SMS stubbed for v1. |
 | Telegram bot (grammY, webhook) | Meets users in Telegram; webhook mode suits Workers (no long polling); grammY's Cloudflare Workers adapter runs as a Worker `fetch` handler. |
-| DeepSeek via `openai` SDK | Cheap, capable natural-language parsing; `baseURL: https://api.deepseek.com`, model `deepseek-chat`; output is treated as untrusted and mapped to a restricted read-only command set. |
+| Cloudflare Agents SDK (`agents`) | In-app conversational agent backed by Durable Objects with SQLite memory: one DO per conversation persists the chat history; the LLM run loop and SSE streaming are hand-rolled so DeepSeek stays the model. |
+| DeepSeek via `openai` SDK | Cheap, capable natural-language parsing; `baseURL: https://api.deepseek.com`, model `deepseek-v4-flash`; output is treated as untrusted and mapped to a restricted read-only command set (bot) or read-only tools (agent). |
 
 ## System Components
 
@@ -61,8 +64,15 @@ flowchart LR
   BotSvc --> DeepSeek[DeepSeek LLM]
   BotSvc --> D1
   BotSvc --> SOROBAN
-  Shared[packages/shared<br/>schema + zod + money] -.-> Next
+  UI -.->|SSE POST /api/agents/*/chat| Next
+  Next -.->|service binding env.AGENTS.fetch| AgentWorker[takapp-agents worker]
+  AgentWorker --> AgentDO[Durable Object per conversation<br/>Cloudflare Agents memory]
+  AgentDO --> DeepSeek
+  AgentDO --> D1
+  AgentDO --> SOROBAN
+  Shared[packages/shared<br/>schema + zod + money + stellar] -.-> Next
   Shared -.-> BotSvc
+  Shared -.-> AgentWorker
 ```
 
 - **Client (PWA)**: Next.js app with service worker (`@serwist/next`); stores the encrypted secret key and recovery phrase locally (IndexedDB/localStorage, WebCrypto). Transaction signing runs in a dedicated Web Worker so signing never blocks the UI.
@@ -70,11 +80,12 @@ flowchart LR
 - **Web Push (RFC 8291/8292)**: a small internal module (`apps/web/src/server/push/web-push.ts`) implemented with Web Crypto + `jose` (Workers-safe). It signs VAPID JWTs (ES256) and encrypts payloads (`aes128gcm`: ECDH + HKDF-SHA256 + AES-128-GCM), and `notifyUser` best-effort sends to all of a user's subscriptions, deleting any that return 404/410. `VAPID_PUBLIC_KEY`/`VAPID_SUBJECT` are public `[vars]`; `VAPID_PRIVATE_KEY` is deployed via `wrangler secret`.
 - **Stellar reverse proxy**: The payment flow's browser-side Stellar traffic (Horizon `loadAccount`, Soroban RPC `simulateTransaction`, Horizon `POST /transactions`) is routed same-origin through `/api/stellar/horizon/*` and `/api/stellar/soroban/*`. The Worker forwards those requests to `HORIZON_URL` / `SOROBAN_RPC_URL` from the edge, so the browser never talks to Stellar directly. `wallet.networkConfig` returns the proxy URLs unless `HORIZON_PUBLIC_URL` / `SOROBAN_PUBLIC_RPC_URL` override them.
 - **Telegram bot (grammY)**: A separate Cloudflare Worker receiving Telegram webhooks via grammY's `webhookCallback(..., 'cloudflare')`. It forwards user messages to DeepSeek, parses the result into a restricted **read-only** command set (balance, shops, history), and executes those commands against D1. There is no signing path in the bot.
-- **DeepSeek**: Natural-language intent parser. It is stateless and returns structured intent only (no free-form execution); prompts never receive secret keys or signed data.
-- **Funding account**: A single server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`, XLM) on signup. It never signs user transactions, never issues or moves TAK, and never touches user balances.
-- **packages/shared**: Drizzle schema, stroop money helpers, zod schemas, and verification providers shared by the web and bot workers; the schema is the single source of truth for DB types.
-- **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, coffee shops, menu items, payments, and gifts.
-- **Stellar (Horizon)**: Reads XLM balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding) — never for user accounts. TAK balances are read from the SEP-41 contract's `Balance` ledger entry via **Soroban RPC** `getContractData`; TAK transfers are simulated + assembled via **Soroban RPC** before client submission.
+- **Conversational agent (TakAppAgent)**: A third Cloudflare Worker (`apps/agents`, binding `takapp-agents`) that hosts the in-app AI assistant on the Cloudflare Agents SDK. One Durable Object (`TakAppAgent`) exists per conversation (`memoryId`) and persists chat history in its own SQLite memory (`this.sql`). The web worker forwards chat requests over a **service binding** after verifying SEP-10 auth and `memoryId` ownership; the agent streams an SSE response while calling DeepSeek (`deepseek-v4-flash`) with a read-only tool set (list shops, shop menu, TAK info, user balance, order history). The worker has no public route and only trusts the internal-token/owner headers from the service binding.
+- **DeepSeek**: Natural-language intent parser (bot) and chat model (agent). Stateless from the caller's perspective; prompts never receive secret keys or signed data.
+- **Funding account**: A server-held Stellar key (`FUNDING_SECRET`, env only) that funds new accounts (`createAccount`, XLM) on signup. It never signs user transactions, never issues or moves TAK, and never touches user balances.
+- **packages/shared**: Drizzle schema, stroop money helpers, the read-only Stellar balance reader, zod schemas, and verification providers shared by the web, bot, and agents workers; the schema is the single source of truth for DB types.
+- **D1 database**: SQLite via Drizzle; holds users, sessions, verification state, Telegram bindings, conversations, the agent conversation index, coffee shops, menu items, payments, and gifts.
+- **Stellar (Horizon)**: Reads XLM balances and account state, and receives client-submitted transactions. The server only submits operations for its own accounts (account funding, casino payouts/withdraws, and the claim faucet) — never for user accounts. TAK balances are read from the SEP-41 contract's `Balance` ledger entry via **Soroban RPC** `getContractData`; TAK transfers are simulated + assembled via **Soroban RPC** before client submission.
 
 ## Authentication & Key Management
 
@@ -121,13 +132,14 @@ flowchart LR
 - `verifications` — type (email/sms/totp), identifier, status, one-time code digest, expiry.
 - `telegram_bindings` — user id, telegram user id (unique), telegram username, bound/authorized at, last seen.
 - `conversations` — user id, telegram chat id, short-lived context window for bot replies (no secrets, expiry enforced).
+- `agent_conversations` — the D1 **index** for the in-app agent: id, user id (nullable; null when anonymous), `anonymous_key` (nullable device UUID), `agent_id`, `memory_id` (unique, the Durable Object id), title, created/last-message timestamps. Exactly one of `user_id`/`anonymous_key` is set (enforced in app code). It does **not** duplicate chat history — the DO's SQLite memory is the source of truth.
 - `coffee_shops` — id, owner user id, name, address, `quote_of_the_day`, `latitude`/`longitude` (SQLite `real`, GPS only — never money), active status. Editable by the owning user (via the `owner` router) and by admins.
 - `menu_items` — id, coffee shop id, name, `price` (string, stroops), `sort_order`, timestamp. The owner edits the whole menu in one atomic `db.batch` (delete + re-insert); customers pay the item's stored price.
 - `payments` — id, user id, coffee shop id (nullable), `menu_item_id` (nullable, set when a menu item is bought so history shows what was purchased), `order_id` (nullable, set when the payment backs a coffee order), `recipient_public_key` (the actual on-chain destination for both shop and P2P payments, so history stays stable if names change), amount (string, stroops), asset (TAK/XLM), **unique tx hash**, status (`submitted`), timestamp. `payments.record` is idempotent on `tx_hash` so client retries after network failures never double-insert; when `menu_item_id` is present the stored amount is taken server-side from the menu item (server-authoritative), never trusted from the client.
 - `orders` — id, user id (customer), coffee shop id, `total_amount` (string, stroops, server-recomputed from menu prices), status (`placed` | `ready`), created/ready timestamps. One order = one summed on-chain TAK transfer recorded as one `payments` row (linked via `payments.order_id`).
 - `order_items` — id, order id, `menu_item_id` (nullable reference), `name`/`unit_price` snapshots (so order text stays stable if the menu later changes), quantity.
 - `push_subscriptions` — id, user id, `endpoint` (unique), `p256dh`/`auth` (Web Push VAPID keys), created timestamp. Used by the server to deliver Web Push notifications (new order to the owner, order-ready to the customer).
-- `gifts` — retained for schema compatibility but no longer used (the welcome-gift flow was removed).
+- `gifts` — one-time claim faucet record: `type='tak-claim-3'`, `amount` in stroops (3 TAK). A composite unique index on `(user_id, type)` enforces exactly one claim per user; the row is written before the transfer and removed on failure so the user can retry.
 - `admin_audit_log` — id, admin user id, action (`totp.enrolled`, `admin.login`, `promote`, `demote`, `shop.create`, `shop.update`, `shop.disable`), optional target, timestamp.
 - `admin_step_up_attempts` — one row per user tracking failed step-up attempts and the lockout timestamp.
 
@@ -139,7 +151,15 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 
 1. On signup, the server uses the funding account (`FUNDING_SECRET`, env only) to submit a `createAccount` transaction funding the new user's public key with the minimum XLM balance.
 2. In local development the funding account itself is funded first via **Friendbot** on testnet; there is no Friendbot equivalent on mainnet.
-3. The funding account is the only server-held key and is never used for user transactions; it never issues or moves TAK.
+3. The funding account is one of two bounded server-held keys (the other is the casino/faucet account) and is never used for user transactions; it never issues or moves TAK.
+
+### Claim free TAK (one-time)
+
+1. On the Get TAK page (`/tak`) a logged-in user taps "Claim 3 free TAK".
+2. `tak.claim` checks the `gifts` table for an existing `type='tak-claim-3'` row; if present it returns `ALREADY_CLAIMED`.
+3. The server derives the faucet key from `GAME_ACCOUNT_SECRET` and reads its TAK balance via Soroban RPC; a missing key or a balance below 3 TAK returns `FAUCET_NOT_READY` / `FAUCET_OUT_OF_FUNDS`.
+4. It reserves the claim by inserting the `gifts` row (`onConflictDoNothing` on the `(user_id, type)` unique index), then signs and submits a SEP-41 `transfer` of 3 TAK from the faucet to the user's public key via `submitTakTransfer`.
+5. On transfer failure the reservation row is deleted so the user can retry; on success the client refetches balances and invalidates `tak.status`, flipping the button to the claimed state.
 
 ### Pay for coffee / send TAK
 
@@ -174,15 +194,24 @@ Money amounts are stored as **strings** in stroops (1 lumen = 10,000,000 stroops
 5. Read-only actions require no signing. Payment execution stays in the PWA until Telegram MiniApp work is scheduled (future bot-payment path).
 6. LLM prompts and replies never contain secret keys, recovery phrases, or signed transactions.
 
+### Conversational agent (in-app AI assistant, read-only for v1)
+
+1. The client opens `/agents`, creates a conversation via `agents.createConversation` (a tRPC `agents` router call) and receives a `memoryId` (the Durable Object id) plus an index row in `agent_conversations`.
+2. The client POSTs `{ memoryId, message }` to `/api/agents/[agentId]/chat`. The web-worker proxy verifies the SEP-10 session (or the anonymous device key), checks the caller owns that `memoryId`, injects `x-agent-user`/`x-agent-owner` + a shared internal token, and forwards to the `takapp-agents` worker over the `AGENTS` service binding.
+3. The agents worker verifies the internal token, maps `agentId` to the `TakAppAgent` Durable Object, and routes to the DO by `idFromName(memoryId)`.
+4. The DO loads history from its SQLite memory, runs a DeepSeek tool-calling loop (`deepseek-v4-flash`) with read-only tools, streams tokens as SSE back through the proxy, and persists the transcript.
+5. Tools (`listShops`, `getShopMenu`, `getTakTokenInfo`, `getUserBalance`, `getOrderHistory`) are read-only and parameterized; balance/history tools refuse politely when anonymous. There is no write path from the agent, and LLM output is treated as untrusted.
+
 ## Security Model
 
 - **Zero-knowledge keys**: the server stores only public keys. Secret keys, mnemonics, and derived encryption material never leave the device.
-- **Funding account (bounded exception)**: the server holds exactly one Stellar secret key (`FUNDING_SECRET`, env only). It funds new accounts (`createAccount`, XLM) — nothing else. It can never sign user transactions, issue or move TAK, or touch user balances; the exception is documented and bounded in code.
+- **Server-held keys (bounded exceptions)**: the server holds two bounded Stellar secret keys, both env-only. `FUNDING_SECRET` funds new accounts (`createAccount`, XLM) — nothing else. `GAME_ACCOUNT_SECRET` signs the casino's own TAK payouts and withdraws, plus the one-time 3-TAK claim faucet. Neither can sign user transactions or touch user balances; the exceptions are documented and bounded in code.
 - **Trust-based payment indexing**: `payments.record` trusts the client-reported `tx_hash`. It is idempotent (unique constraint), but a malicious client could report a fabricated hash. On-chain reconciliation is accepted as future work for v1.
 - **SEP-10 challenge** is single-use, time-limited, and bound to the user's public key; tampered or replayed challenges are rejected (covered by tests).
 - **Password storage**: hashed with PBKDF2-HMAC-SHA256 (100k iterations, Web Crypto) on the server for the account password — capped at the workerd PBKDF2 maximum; the derived encryption key is salted/iterated PBKDF2 on the client.
 - **Rate limiting** on login, verification-code resend, challenge issuance, and TOTP step-up (5 failures then a 15-minute lockout per user via `admin_step_up_attempts`).
 - **Bot authorization**: read-only wallet queries from Telegram run only for users whose Telegram identity is bound and authorized; bindings can be revoked. The bot has no signing path.
+- **Agent authorization**: the agents worker is unreachable from the public internet (service-binding only) and additionally verifies a shared `AGENTS_INTERNAL_TOKEN` header. Tenancy is enforced by the web-worker proxy, which verifies the SEP-10 session (or anonymous device key) and rejects requests whose `memoryId` is not owned by the caller (403). Agent tools are read-only and never reach D1 mutations or the signing path.
 - **LLM as untrusted input**: DeepSeek output is parsed into a restricted, validated read-only command set; free-form LLM text can never drive privileged actions or reach the signing path.
 - **Admin token separation**: session JWTs (`typ: 'user'`) and admin step-up JWTs (`typ: 'admin'`) are signed with different secrets and accepted by different procedures, so one can never be used in place of the other. Privileged routes re-check `role` on every request; demotion or admin-token expiry revokes access immediately.
 - **TOTP secrets at rest**: the enrolled authenticator secret is stored encrypted (AES-256-GCM, `ADMIN_TOTP_ENC_KEY`); the server fails closed if the encryption key is missing.
@@ -198,7 +227,7 @@ The PWA is split across real App Router routes instead of a single-screen shell:
 - `/order/[shopId]` — order page: menu steppers (+/− per item), live client-side total, Pay (signs one TAK transfer), and a confirmation with a link to `/orders`.
 - `/orders` — "My orders": the customer's order history (shop, item text, placed/ready status, time) plus an "Enable notifications" toggle.
 - `/send` — send TAK: recipient search + amount with stroop validation.
-- `/tak` — get TAK: informational entry pointing users to the testnet faucet / exchange.
+- `/tak` — get TAK: one-time "Claim 3 free TAK" button (server pays from the casino/faucet account).
 - `/profile` — profile: display-name editor plus read-only email/phone.
 - `/owner` — owner self-service: edit owned shops (name, address, quote, GPS) and their menu, plus the incoming orders list with "Mark ready" (and owner Web Push opt-in).
 - `/admin` — admin panel (TOTP step-up, shops/users management, including the new quote/GPS/menu fields).
@@ -211,7 +240,8 @@ The UI supports **English (`en`) and Persian (`fa`), defaulting to `fa`**, via a
 
 - Cloudflare Worker hosting the Next.js app via OpenNext (`@opennextjs/cloudflare`).
 - A second Cloudflare Worker hosting the Telegram bot webhook (grammY, `webhookCallback(..., 'cloudflare')`); the Telegram webhook URL is registered via Bot API.
-- Both workers share `packages/shared` (schema, zod schemas, money helpers, verification providers).
+- A third Cloudflare Worker (`takapp-agents`) hosting the conversational agent on the Cloudflare Agents SDK. It is reachable **only** through the `AGENTS` service binding from the web worker (no public route); deploy it before the web worker so the binding resolves.
+- All workers share `packages/shared` (schema, zod schemas, money helpers, stellar balance reader, verification providers).
 - D1 database with Drizzle migrations applied via `pnpm db:generate` / `pnpm db:migrate` (local first, remote explicitly).
 - PWA manifest + service worker (`@serwist/next`) generated at build time; core assets cached for offline use.
 - Environment variables hold Horizon URL, the TAK SEP-41 contract ID and Soroban RPC URL, network passphrase (testnet in dev, public in prod), SEP-10 settings, `FUNDING_SECRET`, `BOT_TOKEN`, and `DEEPSEEK_API_KEY` — never user keys. Admin secrets: `ADMIN_PUBLIC_KEY` (public, in `[vars]`), plus `ADMIN_JWT_SECRET` and `ADMIN_TOTP_ENC_KEY` (deployed via `wrangler secrets`). `ADMIN_TOTP_REQUIRED` (optional, default on) toggles whether the admin TOTP step-up is enforced. `HORIZON_PUBLIC_URL` / `SOROBAN_PUBLIC_RPC_URL` (optional) override the client-facing Stellar endpoints; otherwise the client uses the same-origin `/api/stellar/*` proxy. In local dev, `pnpm --filter @takapp/web dev:proxy` tunnels Stellar traffic through a forward proxy (`STELLAR_DEV_FORWARD_PROXY`, default `http://localhost:2352`).

@@ -2,12 +2,16 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 export interface WorkerEnv {
   DB: D1Database;
+  /** Service binding to the takapp-agents worker (conversational agent). */
+  AGENTS: { fetch(request: Request, init?: RequestInit): Promise<Response> };
+  /** Shared secret with the agents worker, verified over the service binding. */
+  AGENTS_INTERNAL_TOKEN?: string;
   HORIZON_URL: string;
   NETWORK_PASSPHRASE: string;
   APP_DOMAIN: string;
   JWT_SECRET: string;
   FUNDING_SECRET: string;
-  /** Casino/house account that signs TAK game payouts to winners (and admin withdraws). Env-only. */
+  /** Casino/house account that signs TAK game payouts to winners, admin withdraws, and the one-time 3-TAK claim faucet. Env-only. */
   GAME_ACCOUNT_SECRET: string;
   SOROBAN_RPC_URL: string;
   /** Client-facing Horizon base; defaults to same-origin /api/stellar/horizon. */

@@ -9,7 +9,7 @@ export async function parseUserRequest(env: BotEnv, text: string): Promise<BotIn
     baseURL: env.DEEPSEEK_BASE_URL,
   });
   const completion = await client.chat.completions.create({
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     temperature: 0,
     max_tokens: 120,
     response_format: { type: 'json_object' },

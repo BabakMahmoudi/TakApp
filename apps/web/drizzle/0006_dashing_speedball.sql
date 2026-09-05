@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `gifts_user_id_type_unique` ON `gifts` (`user_id`,`type`);

@@ -7,6 +7,7 @@ import type { MockDb } from './mock-db';
 
 export const testEnv: WorkerEnv = {
   DB: {} as D1Database,
+  AGENTS: { fetch: async () => new Response('', { status: 200 }) },
   HORIZON_URL: 'https://horizon-testnet.stellar.org',
   NETWORK_PASSPHRASE: 'Test SDF Network ; September 2015',
   APP_DOMAIN: 'takapp.dev',

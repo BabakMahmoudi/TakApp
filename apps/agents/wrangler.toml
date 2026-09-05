@@ -1,4 +1,4 @@
-name = "takapp-bot"
+name = "takapp-agents"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat"]
@@ -8,6 +8,13 @@ binding = "DB"
 database_name = "takapp-d1"
 database_id = "00000000-0000-0000-0000-000000000000"
 
+[durable_objects]
+bindings = [{ name = "TakAppAgent", class_name = "TakAppAgent" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TakAppAgent"]
+
 [vars]
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
@@ -15,11 +22,13 @@ APP_DOMAIN = "takapp.dev"
 SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
 TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-# BOT_TOKEN is secret; set it with `wrangler secret put BOT_TOKEN`
 # DEEPSEEK_API_KEY is secret; set it with `wrangler secret put DEEPSEEK_API_KEY`
+# AGENTS_INTERNAL_TOKEN is secret; shared with the web worker service binding.
 
 [env.preview]
-name = "takapp-bot-preview"
+name = "takapp-agents-preview"
+[env.preview.durable_objects]
+bindings = [{ name = "TakAppAgent", class_name = "TakAppAgent" }]
 [env.preview.vars]
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
@@ -33,7 +42,9 @@ database_name = "takapp-d1-preview"
 database_id = "ccf200f7-d636-49b0-b63f-ddda3f00c989"
 
 [env.production]
-name = "takapp-bot-production"
+name = "takapp-agents-production"
+[env.production.durable_objects]
+bindings = [{ name = "TakAppAgent", class_name = "TakAppAgent" }]
 [env.production.vars]
 HORIZON_URL = "https://horizon.stellar.org"
 NETWORK_PASSPHRASE = "Public Global Stellar Network ; September 2015"

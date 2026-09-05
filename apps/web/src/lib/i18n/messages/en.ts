@@ -77,8 +77,13 @@ const en = {
   'send.error.amountPositive': 'Amount must be greater than zero',
 
   'tak.title': 'Get TAK',
-  'tak.faucetTitle': 'Testnet faucet',
-  'tak.faucetDescription': 'Get TAK from the Stellar testnet faucet or an exchange that lists it.',
+  'tak.claimButton': 'Claim 3 free TAK',
+  'tak.claiming': 'Claiming…',
+  'tak.claimed': "You've claimed 3 free TAK",
+  'tak.claim.errors.alreadyClaimed': 'You have already claimed your free TAK',
+  'tak.claim.errors.notReady': 'The faucet is not ready yet',
+  'tak.claim.errors.outOfFunds': 'The faucet is out of funds',
+  'tak.claim.errors.claimFailed': 'Claim failed, please try again',
 
   'wallet.title': 'Wallet',
   'wallet.balances': 'Balances',
@@ -198,6 +203,8 @@ const en = {
 
   'nav.games': 'Games',
 
+  'nav.agents': 'AI Assistant',
+
   'games.title': 'Games',
   'games.loading': 'Loading games…',
   'games.unavailable': 'Games are unavailable',
@@ -277,6 +284,16 @@ const en = {
   'admin.casino.amount': 'Amount (TAK)',
   'admin.casino.withdrawn': 'Withdrawn',
   'admin.casino.notReady': 'Casino key is not configured',
+
+  'agents.title': 'AI Assistant',
+  'agents.newConversation': 'New conversation',
+  'agents.inputPlaceholder': 'Ask about TakApp, TAK, or coffee…',
+  'agents.send': 'Send',
+  'agents.loading': 'Loading…',
+  'agents.noConversations': 'No conversations yet',
+  'agents.thinking': 'Thinking…',
+  'agents.error': 'Something went wrong',
+  'agents.untitled': 'New conversation',
 } as const;
 
 export type Messages = { [K in keyof typeof en]: string };

@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -156,15 +156,21 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
-export const gifts = sqliteTable('gifts', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id),
-  type: text('type').notNull(),
-  amount: text('amount').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-});
+export const gifts = sqliteTable(
+  'gifts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    type: text('type').notNull(),
+    amount: text('amount').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    userTypeUnique: uniqueIndex('gifts_user_id_type_unique').on(t.userId, t.type),
+  }),
+);
 
 export const gameSettings = sqliteTable('game_settings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -172,6 +178,17 @@ export const gameSettings = sqliteTable('game_settings', {
   settings: text('settings').notNull(),
   updatedByUserId: integer('updated_by_user_id').references(() => users.id),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const agentConversations = sqliteTable('agent_conversations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').references(() => users.id),
+  anonymousKey: text('anonymous_key'),
+  agentId: text('agent_id').notNull(),
+  memoryId: text('memory_id').notNull().unique(),
+  title: text('title'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  lastMessageAt: integer('last_message_at', { mode: 'timestamp_ms' }),
 });
 
 export const gamePlays = sqliteTable(
@@ -215,3 +232,4 @@ export type GameSettingsRow = typeof gameSettings.$inferSelect;
 export type GamePlay = typeof gamePlays.$inferSelect;
 export type GamePlayStatus = GamePlay['status'];
 export type GamePlayType = GamePlay['playType'];
+export type AgentConversation = typeof agentConversations.$inferSelect;

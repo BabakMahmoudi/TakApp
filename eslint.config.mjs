@@ -36,6 +36,10 @@ export const baseConfig = tseslint.config(
       ],
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/require-await': 'error',
+      '@typescript-eslint/no-unused-expressions': [
+        'error',
+        { allowTaggedTemplates: true },
+      ],
     },
   },
   {

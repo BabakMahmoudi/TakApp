@@ -1,0 +1,65 @@
+import { Address, Horizon, scValToNative, xdr } from '@stellar/stellar-sdk/no-axios';
+import { Durability, Server as SorobanRpc } from '@stellar/stellar-sdk/no-axios/rpc';
+import { stroopsFromLumens, stroopsFromTokenRaw } from './money';
+
+export const TAK_DECIMALS = 7;
+
+export interface BalanceEntry {
+  asset: 'XLM' | 'TAK';
+  stroops: string;
+}
+
+export interface BalanceReader {
+  readBalances(publicKey: string): Promise<BalanceEntry[]>;
+}
+
+/**
+ * Minimal read-only Stellar/Soroban configuration. Both `BotEnv` and `AgentEnv`
+ * satisfy this structurally, so the balance reader stays env-shape agnostic.
+ */
+export interface StellarReadConfig {
+  HORIZON_URL: string;
+  SOROBAN_RPC_URL: string;
+  TAK_CONTRACT_ID: string;
+}
+
+function takBalanceKey(publicKey: string): xdr.ScVal {
+  return xdr.ScVal.scvVec([
+    xdr.ScVal.scvSymbol('Balance'),
+    new Address(publicKey).toScVal(),
+  ]);
+}
+
+export function createBalanceReader(config: StellarReadConfig): BalanceReader {
+  const server = new Horizon.Server(config.HORIZON_URL);
+  const rpc = new SorobanRpc(config.SOROBAN_RPC_URL);
+  return {
+    async readBalances(publicKey: string): Promise<BalanceEntry[]> {
+      const account = await server.loadAccount(publicKey);
+      const entries: BalanceEntry[] = [];
+      for (const balance of account.balances) {
+        if (balance.asset_type === 'native') {
+          entries.push({ asset: 'XLM', stroops: stroopsFromLumens(balance.balance) });
+        }
+      }
+
+      let takStroops = '0';
+      try {
+        const data = await rpc.getContractData(
+          config.TAK_CONTRACT_ID,
+          takBalanceKey(publicKey),
+          Durability.Persistent,
+        );
+        const raw = scValToNative(data.val.contractData().val());
+        if (typeof raw === 'bigint') {
+          takStroops = stroopsFromTokenRaw(raw, TAK_DECIMALS);
+        }
+      } catch {
+        // TAK is best-effort: a fresh account has no Balance ledger entry and an
+        // RPC outage must not blank the XLM read, so both degrade to zero here.
+      }
+      entries.push({ asset: 'TAK', stroops: takStroops });
+      return entries;
+    },
+  };
+}

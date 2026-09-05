@@ -1,0 +1,5 @@
+# Local dev secrets for the agents worker (copy to .dev.vars and fill in).
+DEEPSEEK_API_KEY=sk-replace-with-your-deepseek-key
+# Shared secret that the web worker sends as `x-agent-internal-token` over the
+# service binding so the agents worker can tell proxied traffic from direct hits.
+AGENTS_INTERNAL_TOKEN=replace-with-a-long-random-token

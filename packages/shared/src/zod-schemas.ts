@@ -98,6 +98,12 @@ export const pushSubscriptionSchema = z.object({
   auth: z.string().min(1).max(512),
 });
 
+export const agentIdSchema = z.enum(['takapp-agent']);
+
+export const createAgentConversationSchema = z.object({
+  agentId: agentIdSchema,
+});
+
 export const intentActionSchema = z.enum(['balance', 'shops', 'history']);
 
 export const intentSchema = z.discriminatedUnion('action', [
@@ -118,6 +124,7 @@ export const intentSchema = z.discriminatedUnion('action', [
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type BotIntent = z.infer<typeof intentSchema>;
+export type AgentId = z.infer<typeof agentIdSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UserSearchInput = z.infer<typeof userSearchSchema>;
 export type MenuItemInput = z.infer<typeof menuItemInputSchema>;

@@ -13,6 +13,10 @@ database_name = "takapp-d1"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "./drizzle"
 
+[[services]]
+binding = "AGENTS"
+service = "takapp-agents"
+
 [vars]
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
@@ -45,3 +49,7 @@ binding = "DB"
 database_name = "takapp-d1-preview"
 database_id = "ccf200f7-d636-49b0-b63f-ddda3f00c989"
 migrations_dir = "./drizzle"
+
+[[env.preview.services]]
+binding = "AGENTS"
+service = "takapp-agents-preview"

@@ -79,8 +79,13 @@ const fa: Messages = {
   'send.error.amountPositive': 'مقدار باید بزرگ‌تر از صفر باشد',
 
   'tak.title': 'دریافت TAK',
-  'tak.faucetTitle': 'فاست تست‌نت',
-  'tak.faucetDescription': 'از فاست تست‌نت استلار یا صرافی‌ای که آن را لیست کرده، TAK دریافت کنید.',
+  'tak.claimButton': 'دریافت ۳ TAK رایگان',
+  'tak.claiming': 'در حال دریافت…',
+  'tak.claimed': '۳ TAK رایگان دریافت کردید',
+  'tak.claim.errors.alreadyClaimed': 'شما قبلاً TAK رایگان خود را دریافت کرده‌اید',
+  'tak.claim.errors.notReady': 'فاست هنوز آماده نیست',
+  'tak.claim.errors.outOfFunds': 'موجودی فاست کافی نیست',
+  'tak.claim.errors.claimFailed': 'دریافت ناموفق بود، دوباره تلاش کنید',
 
   'wallet.title': 'کیف پول',
   'wallet.balances': 'موجودی‌ها',
@@ -200,6 +205,8 @@ const fa: Messages = {
 
   'nav.games': 'بازی‌ها',
 
+  'nav.agents': 'دستیار هوشمند',
+
   'games.title': 'بازی‌ها',
   'games.loading': 'در حال بارگذاری بازی‌ها…',
   'games.unavailable': 'بازی‌ها در دسترس نیستند',
@@ -279,6 +286,16 @@ const fa: Messages = {
   'admin.casino.amount': 'مقدار (TAK)',
   'admin.casino.withdrawn': 'برداشت شد',
   'admin.casino.notReady': 'کلید کازینو پیکربندی نشده',
+
+  'agents.title': 'دستیار هوشمند',
+  'agents.newConversation': 'گفتگوی جدید',
+  'agents.inputPlaceholder': 'درباره TakApp، TAK یا قهوه بپرسید…',
+  'agents.send': 'ارسال',
+  'agents.loading': 'در حال بارگذاری…',
+  'agents.noConversations': 'هنوز گفتگویی ثبت نشده',
+  'agents.thinking': 'در حال فکر کردن…',
+  'agents.error': 'مشکلی پیش آمد',
+  'agents.untitled': 'گفتگوی جدید',
 };
 
 export default fa;

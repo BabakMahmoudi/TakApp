@@ -43,6 +43,20 @@
       "when": 1788577747873,
       "tag": "0005_regular_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788642428123,
+      "tag": "0006_dashing_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788647198603,
+      "tag": "0007_nice_expediter",
+      "breakpoints": true
     }
   ]
 }
