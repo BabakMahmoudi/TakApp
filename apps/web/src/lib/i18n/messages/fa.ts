@@ -160,6 +160,41 @@ const fa: Messages = {
   'owner.invalidLocation': 'مختصات معتبر وارد کنید',
   'owner.invalidPrice': 'قیمت TAK معتبر وارد کنید',
   'owner.invalidItem': 'هر آیتم به نام نیاز دارد',
+
+  'nav.myOrders': 'سفارش‌های من',
+
+  'buy.searchPlaceholder': 'جستجوی فروشگاه‌ها',
+  'buy.select': 'انتخاب',
+
+  'order.loading': 'در حال بارگذاری…',
+  'order.notFound': 'فروشگاه یافت نشد',
+  'order.menu': 'منو',
+  'order.total': 'جمع',
+  'order.pay': 'پرداخت / سفارش',
+  'order.selectShop': 'انتخاب کافه',
+  'order.emptyCart': 'آیتمی انتخاب نشده',
+  'order.confirmed': 'سفارش ثبت شد',
+  'order.viewOrders': 'مشاهده سفارش‌های من',
+  'order.error.noAccount': 'این فروشگاه هنوز حساب پرداخت ندارد',
+
+  'orders.title': 'سفارش‌های من',
+  'orders.loading': 'در حال بارگذاری سفارش‌ها…',
+  'orders.noOrders': 'هنوز سفارشی ثبت نشده',
+  'orders.placed': 'ثبت شده',
+  'orders.ready': 'آماده',
+  'orders.enableNotifications': 'فعال‌سازی اعلان‌ها',
+  'orders.notificationsEnabled': 'اعلان‌ها فعال است',
+  'orders.notificationsUnavailable': 'اعلان در این دستگاه در دسترس نیست',
+
+  'ownerOrders.title': 'سفارش‌ها',
+  'ownerOrders.loading': 'در حال بارگذاری سفارش‌ها…',
+  'ownerOrders.noOrders': 'هنوز سفارشی ثبت نشده',
+  'ownerOrders.markReady': 'آماده شد',
+  'ownerOrders.ready': 'آماده',
+  'ownerOrders.newOrder': 'سفارش جدید',
+
+  'push.newOrder': 'سفارش جدید',
+  'push.orderReady': 'سفارش شما آماده است',
 };
 
 export default fa;

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { lumensFromStroops } from '@takapp/shared/money';
 import { formatAmount, useI18n } from '../lib/i18n';
 import { useWallet } from '../lib/wallet-provider';
+import BuyCoffeeButton from './buy-coffee-button';
 
 export default function HomeDashboard() {
   const { session, balanceQuery, error, setError } = useWallet();
@@ -50,12 +51,7 @@ export default function HomeDashboard() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <Link
-          href="/buy"
-          className="rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
-        >
-          {t('home.buyCoffee')}
-        </Link>
+        <BuyCoffeeButton />
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/send"

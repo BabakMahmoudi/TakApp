@@ -30,3 +30,27 @@ export function distanceMeters(a: GeoPoint, b: GeoPoint): number {
     Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+export interface LocatedShop {
+  id: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export function nearestShopWithinMeters(
+  shops: readonly LocatedShop[],
+  point: GeoPoint,
+  maxMeters: number,
+): number | null {
+  let nearestId: number | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const shop of shops) {
+    if (shop.latitude == null || shop.longitude == null) continue;
+    const distance = distanceMeters(point, { latitude: shop.latitude, longitude: shop.longitude });
+    if (distance <= maxMeters && distance < nearestDistance) {
+      nearestId = shop.id;
+      nearestDistance = distance;
+    }
+  }
+  return nearestId;
+}

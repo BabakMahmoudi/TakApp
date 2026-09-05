@@ -56,6 +56,14 @@ export interface PaymentInput {
   recipientPublicKey?: string;
 }
 
+export interface OrderInput {
+  secretKey: string;
+  shopId: number;
+  items: { menuItemId: number; quantity: number }[];
+  amount: string;
+  ownerPublicKey: string;
+}
+
 interface WalletContextValue {
   session: SessionRecord | null;
   busy: boolean;
@@ -73,6 +81,7 @@ interface WalletContextValue {
   logout: () => void;
   signPayment: (action: PaymentAction) => void;
   submitPayment: (input: PaymentInput) => Promise<void>;
+  submitOrder: (input: OrderInput) => Promise<{ orderId: number; totalAmount: string }>;
   submitPaymentPassword: (password: string) => Promise<void>;
   cancelPaymentPassword: () => void;
 }
@@ -110,6 +119,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     retry: false,
   });
   const recordPaymentMutation = trpc.payments.record.useMutation();
+  const placeOrderMutation = trpc.orders.place.useMutation();
 
   useEffect(() => {
     if (adminStatusQuery.error) console.warn('[admin.status]', adminStatusQuery.error);
@@ -208,6 +218,31 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await balanceQuery.refetch();
   }
 
+  async function submitOrder(input: OrderInput): Promise<{ orderId: number; totalAmount: string }> {
+    const config = networkConfigQuery.data;
+    if (!config) throw new Error('Network config not loaded');
+    const txHash = await withTimeout(
+      worker().submitPayment({
+        secretKey: input.secretKey,
+        destination: input.ownerPublicKey,
+        contractId: config.takToken.contractId,
+        amountRaw: input.amount,
+        rpcUrl: config.sorobanRpcUrl,
+        horizonUrl: config.horizonUrl,
+        networkPassphrase: config.networkPassphrase,
+      }),
+      ATTEMPT_TIMEOUT_MS,
+    );
+    const result = await placeOrderMutation.mutateAsync({
+      shopId: input.shopId,
+      items: input.items,
+      amount: input.amount,
+      txHash,
+    });
+    await balanceQuery.refetch();
+    return result;
+  }
+
   async function refetchBalances(): Promise<void> {
     await balanceQuery.refetch();
   }
@@ -229,6 +264,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     logout,
     signPayment,
     submitPayment,
+    submitOrder,
     submitPaymentPassword,
     cancelPaymentPassword,
   };

@@ -158,6 +158,41 @@ const en = {
   'owner.invalidLocation': 'Enter valid coordinates',
   'owner.invalidPrice': 'Enter a valid TAK price',
   'owner.invalidItem': 'Each item needs a name',
+
+  'nav.myOrders': 'My Orders',
+
+  'buy.searchPlaceholder': 'Search shops',
+  'buy.select': 'Select',
+
+  'order.loading': 'Loading…',
+  'order.notFound': 'Shop not found',
+  'order.menu': 'Menu',
+  'order.total': 'Total',
+  'order.pay': 'Pay / Order',
+  'order.selectShop': 'Select coffee shop',
+  'order.emptyCart': 'No items selected',
+  'order.confirmed': 'Order placed',
+  'order.viewOrders': 'View my orders',
+  'order.error.noAccount': 'This shop has no payment account yet',
+
+  'orders.title': 'My orders',
+  'orders.loading': 'Loading orders…',
+  'orders.noOrders': 'No orders yet',
+  'orders.placed': 'Placed',
+  'orders.ready': 'Ready',
+  'orders.enableNotifications': 'Enable notifications',
+  'orders.notificationsEnabled': 'Notifications on',
+  'orders.notificationsUnavailable': 'Notifications unavailable on this device',
+
+  'ownerOrders.title': 'Orders',
+  'ownerOrders.loading': 'Loading orders…',
+  'ownerOrders.noOrders': 'No orders yet',
+  'ownerOrders.markReady': 'Mark ready',
+  'ownerOrders.ready': 'Ready',
+  'ownerOrders.newOrder': 'New order',
+
+  'push.newOrder': 'New order',
+  'push.orderReady': 'Your order is ready',
 } as const;
 
 export type Messages = { [K in keyof typeof en]: string };

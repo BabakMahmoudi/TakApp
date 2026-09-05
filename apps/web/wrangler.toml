@@ -20,6 +20,9 @@ APP_DOMAIN = "takapp.dev"
 SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
 TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 ADMIN_PUBLIC_KEY = "G-REPLACE-WITH-FIRST-ADMIN-PUBLIC-KEY"
+VAPID_PUBLIC_KEY = "REPLACE-WITH-VAPID-PUBLIC-KEY"
+VAPID_SUBJECT = "mailto:admin@takapp.dev"
+# VAPID_PRIVATE_KEY is secret; set it with `wrangler secret put VAPID_PRIVATE_KEY`
 # Optional: override the client-facing Stellar endpoints (default: same-origin /api/stellar/horizon|soroban)
 # HORIZON_PUBLIC_URL = ""
 # SOROBAN_PUBLIC_RPC_URL = ""
@@ -34,6 +37,8 @@ TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 APP_DOMAIN = "takapp.dev"
 ADMIN_PUBLIC_KEY = "GCGXCQE7UE5RLKAN2SLJLWAGXWE4MR3VUUUOHBVWJOOA2HKUQTJGKV5P"
 ADMIN_TOTP_REQUIRED=false
+VAPID_PUBLIC_KEY = "BOukW63V1-vIyjBcUzfA_p59ZYzUfkmMfoY-xyDw2Bf8UepUzl_0zb0ofEOEIbWuLqRPSkKLrT4LkcowLm3pb9c"
+VAPID_SUBJECT = "mailto:admin@takapp.dev"
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "takapp-d1-preview"

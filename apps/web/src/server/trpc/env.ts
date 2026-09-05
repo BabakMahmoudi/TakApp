@@ -18,4 +18,7 @@ export interface WorkerEnv {
   ADMIN_TOTP_ENC_KEY: string;
   /** Set to "false" to bypass the TOTP step-up when opening the admin panel. */
   ADMIN_TOTP_REQUIRED?: string | boolean;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_KEY: string;
+  VAPID_SUBJECT: string;
 }

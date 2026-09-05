@@ -76,6 +76,28 @@ export const paymentRecordSchema = z
     message: 'menuItemId requires coffeeShopId',
   });
 
+export const orderItemInputSchema = z.object({
+  menuItemId: z.number().int().positive(),
+  quantity: z.number().int().min(1).max(999),
+});
+
+export const placeOrderSchema = z.object({
+  shopId: z.number().int().positive(),
+  items: z.array(orderItemInputSchema).min(1).max(50),
+  amount: stroopsStringSchema,
+  txHash: z.string().min(1).max(100),
+});
+
+export const markOrderReadySchema = z.object({
+  orderId: z.number().int().positive(),
+});
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().min(1).max(2048),
+  p256dh: z.string().min(1).max(2048),
+  auth: z.string().min(1).max(512),
+});
+
 export const intentActionSchema = z.enum(['balance', 'shops', 'history']);
 
 export const intentSchema = z.discriminatedUnion('action', [
@@ -101,3 +123,7 @@ export type UserSearchInput = z.infer<typeof userSearchSchema>;
 export type MenuItemInput = z.infer<typeof menuItemInputSchema>;
 export type ShopLocation = z.infer<typeof shopLocationSchema>;
 export type PaymentRecordInput = z.infer<typeof paymentRecordSchema>;
+export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
+export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
+export type MarkOrderReadyInput = z.infer<typeof markOrderReadySchema>;
+export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>;

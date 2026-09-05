@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import OwnerOrders from '../../components/owner-orders';
 import OwnerPanel from '../../components/owner-panel';
 import { useI18n } from '../../lib/i18n';
 import { useWallet } from '../../lib/wallet-provider';
@@ -24,6 +25,7 @@ export default function OwnerPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
       <h1 className="text-lg font-semibold text-coffee-100">{t('owner.title')}</h1>
       <OwnerPanel />
+      <OwnerOrders />
     </main>
   );
 }

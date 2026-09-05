@@ -111,11 +111,48 @@ export const payments = sqliteTable('payments', {
     .references(() => users.id),
   coffeeShopId: integer('coffee_shop_id').references(() => coffeeShops.id),
   menuItemId: integer('menu_item_id').references(() => menuItems.id),
+  orderId: integer('order_id').references(() => orders.id),
   recipientPublicKey: text('recipient_public_key'),
   amount: text('amount').notNull(),
   asset: text('asset').notNull(),
   txHash: text('tx_hash').unique(),
   status: text('status').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const orders = sqliteTable('orders', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  coffeeShopId: integer('coffee_shop_id')
+    .notNull()
+    .references(() => coffeeShops.id),
+  totalAmount: text('total_amount').notNull(),
+  status: text('status').notNull().default('placed'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  readyAt: integer('ready_at', { mode: 'timestamp_ms' }),
+});
+
+export const orderItems = sqliteTable('order_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  orderId: integer('order_id')
+    .notNull()
+    .references(() => orders.id),
+  menuItemId: integer('menu_item_id').references(() => menuItems.id),
+  name: text('name').notNull(),
+  unitPrice: text('unit_price').notNull(),
+  quantity: integer('quantity').notNull(),
+});
+
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
@@ -135,5 +172,8 @@ export type TelegramBinding = typeof telegramBindings.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type CoffeeShop = typeof coffeeShops.$inferSelect;
 export type MenuItem = typeof menuItems.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type OrderItem = typeof orderItems.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type AdminStepUpAttempt = typeof adminStepUpAttempts.$inferSelect;

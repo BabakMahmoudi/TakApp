@@ -175,6 +175,7 @@ class SelectQuery {
 class InsertQuery {
   private valuesRow: Record<string, unknown> | null = null;
   private conflictHandled = false;
+  private upsert = false;
 
   constructor(
     private readonly db: MockDb,
@@ -188,6 +189,12 @@ class InsertQuery {
 
   onConflictDoNothing() {
     this.conflictHandled = true;
+    return this;
+  }
+
+  onConflictDoUpdate() {
+    this.conflictHandled = true;
+    this.upsert = true;
     return this;
   }
 
@@ -206,12 +213,21 @@ class InsertQuery {
     const table = this.db.tables[this.tableName];
     if (!table) throw new Error(`MockDb: unknown table "${this.tableName}"`);
     if (!this.valuesRow) throw new Error('MockDb: insert called without values');
-    const conflict = (table.unique ?? []).some((column) => {
+    const conflictingColumn = (table.unique ?? []).find((column) => {
       const value = this.valuesRow?.[column];
       if (value === null || value === undefined) return false;
       return table.rows.some((row) => row[column] === value);
     });
-    if (conflict) {
+    if (conflictingColumn) {
+      if (this.upsert) {
+        const value = this.valuesRow[conflictingColumn];
+        const existing = table.rows.find((row) => row[conflictingColumn] === value);
+        if (existing) {
+          Object.assign(existing, this.valuesRow);
+          return [existing];
+        }
+        return [];
+      }
       if (this.conflictHandled) return [];
       throw new Error(`MockDb: unique constraint violated on "${this.tableName}"`);
     }

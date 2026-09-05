@@ -4,6 +4,7 @@ import {
   compareStroops,
   isPositiveStroops,
   lumensFromStroops,
+  mulStroops,
   parseStroops,
   stroopsFromLumens,
   stroopsFromTokenRaw,
@@ -64,5 +65,18 @@ describe('money', () => {
 
   it('rejects negative token raw amounts', () => {
     expect(() => stroopsFromTokenRaw(-1n, 7)).toThrow();
+  });
+
+  it('multiplies stroops by an integer quantity without floating point', () => {
+    expect(mulStroops('5000000', 0)).toBe('0');
+    expect(mulStroops('5000000', 1)).toBe('5000000');
+    expect(mulStroops('5000000', 3)).toBe('15000000');
+    expect(mulStroops('999999999999999999999', 1000)).toBe('999999999999999999999000');
+  });
+
+  it('rejects non-integer or negative multipliers', () => {
+    expect(() => mulStroops('5000000', 1.5)).toThrow();
+    expect(() => mulStroops('5000000', -1)).toThrow();
+    expect(() => mulStroops('5000000', NaN)).toThrow();
   });
 });

@@ -1,7 +1,9 @@
 import { adminRouter } from './routers/admin';
 import { authRouter } from './routers/auth';
+import { ordersRouter } from './routers/orders';
 import { ownerRouter } from './routers/owner';
 import { paymentsRouter } from './routers/payments';
+import { pushRouter } from './routers/push';
 import { shopsRouter } from './routers/shops';
 import { usersRouter } from './routers/users';
 import { walletRouter } from './routers/wallet';
@@ -15,6 +17,8 @@ export const appRouter = router({
   payments: paymentsRouter,
   admin: adminRouter,
   owner: ownerRouter,
+  orders: ordersRouter,
+  push: pushRouter,
 });
 
 export type AppRouter = typeof appRouter;

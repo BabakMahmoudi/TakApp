@@ -17,6 +17,9 @@ export const testEnv: WorkerEnv = {
   ADMIN_PUBLIC_KEY: `G${'A'.repeat(55)}`,
   ADMIN_JWT_SECRET: 'test-admin-jwt-secret',
   ADMIN_TOTP_ENC_KEY: 'test-totp-enc-key',
+  VAPID_PUBLIC_KEY: 'test-vapid-public-key',
+  VAPID_PRIVATE_KEY: 'test-vapid-private-key',
+  VAPID_SUBJECT: 'mailto:test@takapp.dev',
 };
 
 const callerFactory = appRouter.createCaller;

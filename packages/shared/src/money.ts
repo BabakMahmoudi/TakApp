@@ -22,6 +22,13 @@ export function addStroops(a: string, b: string): string {
   return (parseStroops(a) + parseStroops(b)).toString();
 }
 
+export function mulStroops(a: string, n: number): string {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`Invalid stroop multiplier: "${n}"`);
+  }
+  return (parseStroops(a) * BigInt(n)).toString();
+}
+
 export function subStroops(a: string, b: string): string {
   return (parseStroops(a) - parseStroops(b)).toString();
 }

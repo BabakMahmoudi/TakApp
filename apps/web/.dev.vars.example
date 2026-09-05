@@ -32,3 +32,6 @@ ADMIN_TOTP_REQUIRED=true
 # The proxy tunnels outbound HTTPS through STELLAR_DEV_FORWARD_PROXY.
 # STELLAR_DEV_FORWARD_PROXY=http://localhost:2352
 # STELLAR_DEV_PROXY_PORT=8788
+
+VAPID_PUBLIC_KEY = "BOukW63V1-vIyjBcUzfA_p59ZYzUfkmMfoY-xyDw2Bf8UepUzl_0zb0ofEOEIbWuLqRPSkKLrT4LkcowLm3pb9c"
+VAPID_SUBJECT = "mailto:admin@takapp.dev"

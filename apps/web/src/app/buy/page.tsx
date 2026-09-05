@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { lumensFromStroops } from '@takapp/shared/money';
 import { distanceMeters, getCurrentPosition } from '../../lib/geo';
 import type { GeoPoint } from '../../lib/geo';
@@ -9,30 +10,15 @@ import { formatAmount, useI18n } from '../../lib/i18n';
 import { trpc } from '../../lib/trpc/trpc';
 import { useWallet } from '../../lib/wallet-provider';
 
-interface MenuItem {
-  id: number;
-  name: string;
-  price: string;
-}
-
-interface Shop {
-  id: number;
-  name: string;
-  address: string | null;
-  quoteOfTheDay: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  ownerPublicKey: string | null;
-  menu: MenuItem[];
-}
-
 export default function BuyPage() {
-  const { session, busy, error, setError, signPayment, submitPayment } = useWallet();
+  const { session } = useWallet();
   const { t, locale } = useI18n();
+  const router = useRouter();
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const shopsQuery = trpc.shops.list.useQuery(undefined, {
+  const [search, setSearch] = useState('');
+  const shopsQuery = trpc.shops.listForMe.useQuery(undefined, {
     enabled: !!session,
     retry: false,
   });
@@ -41,8 +27,21 @@ export default function BuyPage() {
     new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : 'en-US', { maximumFractionDigits: 0 }).format(n);
 
   const sorted = useMemo(() => {
-    const shops = shopsQuery.data?.shops ?? [];
-    if (!location) return shops.map((shop) => ({ shop, distance: null as number | null }));
+    const query = search.trim().toLowerCase();
+    const shops = (shopsQuery.data?.shops ?? []).filter(
+      (shop) =>
+        query.length === 0 ||
+        shop.name.toLowerCase().includes(query) ||
+        (shop.address ?? '').toLowerCase().includes(query),
+    );
+    if (!location) {
+      return shops
+        .map((shop) => ({ shop, distance: null as number | null }))
+        .sort(
+          (a, b) =>
+            b.shop.previousOrderCount - a.shop.previousOrderCount || a.shop.name.localeCompare(b.shop.name),
+        );
+    }
     return shops
       .map((shop) => ({
         shop,
@@ -52,7 +51,7 @@ export default function BuyPage() {
             : null,
       }))
       .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
-  }, [shopsQuery.data, location]);
+  }, [shopsQuery.data, location, search]);
 
   if (!session) {
     return (
@@ -74,23 +73,6 @@ export default function BuyPage() {
       .finally(() => setLocating(false));
   }
 
-  function buyItem(shop: Shop, item: MenuItem): void {
-    setError(null);
-    if (!shop.ownerPublicKey) {
-      setError({ message: t('buy.error.noAccount') });
-      return;
-    }
-    signPayment(async (secretKey) => {
-      await submitPayment({
-        secretKey,
-        destination: shop.ownerPublicKey as string,
-        stroops: item.price,
-        coffeeShopId: shop.id,
-        menuItemId: item.id,
-      });
-    });
-  }
-
   const nearestId = sorted.find((entry) => entry.distance !== null)?.shop.id;
 
   return (
@@ -107,6 +89,12 @@ export default function BuyPage() {
           </button>
         </div>
         {locationError && <p className="mt-2 text-xs text-coffee-400">{locationError}</p>}
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t('buy.searchPlaceholder')}
+          className="mt-3 w-full rounded-md border border-coffee-700 bg-coffee-950 px-3 py-2 text-coffee-100"
+        />
         {shopsQuery.isLoading ? (
           <p className="mt-2 text-coffee-300">{t('buy.loading')}</p>
         ) : shopsQuery.isError ? (
@@ -114,48 +102,43 @@ export default function BuyPage() {
         ) : (
           <ul className="mt-2 divide-y divide-coffee-800">
             {sorted.map(({ shop, distance }) => (
-              <li key={shop.id} className="py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm text-coffee-100">
-                      {shop.name}
-                      {shop.id === nearestId && (
-                        <span className="ms-2 rounded bg-coffee-700 px-1.5 py-0.5 text-[10px] text-coffee-100">
-                          {t('buy.nearest')}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-coffee-400">{shop.address ?? '—'}</p>
-                    {distance !== null && (
-                      <p className="text-xs text-coffee-400">
-                        {formatNumber(Math.round(distance))} {t('buy.distanceUnit')}
+              <li key={shop.id}>
+                <button
+                  onClick={() => router.push(`/order/${shop.id}`)}
+                  className="w-full py-3 text-start"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-coffee-100">
+                        {shop.name}
+                        {shop.id === nearestId && (
+                          <span className="ms-2 rounded bg-coffee-700 px-1.5 py-0.5 text-[10px] text-coffee-100">
+                            {t('buy.nearest')}
+                          </span>
+                        )}
                       </p>
-                    )}
-                    {shop.quoteOfTheDay && (
-                      <p className="mt-1 text-xs italic text-coffee-300">{shop.quoteOfTheDay}</p>
-                    )}
+                      <p className="text-xs text-coffee-400">{shop.address ?? '—'}</p>
+                      {distance !== null && (
+                        <p className="text-xs text-coffee-400">
+                          {formatNumber(Math.round(distance))} {t('buy.distanceUnit')}
+                        </p>
+                      )}
+                      {shop.quoteOfTheDay && (
+                        <p className="mt-1 text-xs italic text-coffee-300">{shop.quoteOfTheDay}</p>
+                      )}
+                      {shop.menu.length > 0 && (
+                        <p className="mt-1 text-xs text-coffee-400">
+                          {shop.menu
+                            .map((item) => `${item.name} ${formatAmount(locale, lumensFromStroops(item.price))}`)
+                            .join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <span className="rounded-md border border-coffee-700 px-2 py-1 text-xs text-coffee-200">
+                      {t('buy.select')}
+                    </span>
                   </div>
-                </div>
-                {shop.menu.length > 0 ? (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    <p className="text-xs font-medium text-coffee-300">{t('buy.menu')}</p>
-                    {shop.menu.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => buyItem(shop, item)}
-                        disabled={busy}
-                        className="flex items-center justify-between gap-2 rounded-md border border-coffee-700 px-3 py-1.5 text-start text-sm text-coffee-100 disabled:opacity-50"
-                      >
-                        <span>{item.name}</span>
-                        <span className="font-mono text-xs text-coffee-300">
-                          {formatAmount(locale, lumensFromStroops(item.price))} TAK
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-xs text-coffee-400">{t('buy.noMenu')}</p>
-                )}
+                </button>
               </li>
             ))}
             {(shopsQuery.data?.shops.length ?? 0) === 0 && (
@@ -164,7 +147,6 @@ export default function BuyPage() {
           </ul>
         )}
       </section>
-      {error && <p className="text-sm text-red-400">{error.message}</p>}
     </main>
   );
 }
