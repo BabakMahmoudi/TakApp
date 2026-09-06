@@ -8,7 +8,7 @@ import { isBootstrapAdmin } from '../../admin/guards';
 import { d1Probe, logStep, serializeError } from '../../logging';
 import { fundNewAccount } from '../../stellar/funding';
 import { buildChallengeXdr, verifyChallengeXdr } from '../../stellar/sep10';
-import { issueSessionToken } from '../../stellar/session-token';
+import { DEFAULT_SESSION_TTL_SECONDS, issueSessionToken, parseTtlSeconds } from '../../stellar/session-token';
 import { publicProcedure, router } from '../trpc';
 import type { WorkerEnv } from '../env';
 
@@ -205,6 +205,7 @@ export const authRouter = router({
         secret: ctx.env.JWT_SECRET,
         publicKey: input.publicKey,
         jti: input.nonce,
+        ttlSeconds: parseTtlSeconds(ctx.env.SESSION_TTL_SECONDS, DEFAULT_SESSION_TTL_SECONDS),
       });
       await ctx.db.update(sessions).set({ token }).where(eq(sessions.id, session.id));
       return { token };

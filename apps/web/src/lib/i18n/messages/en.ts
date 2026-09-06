@@ -28,6 +28,7 @@ const en = {
   'auth.loggingIn': 'Logging in…',
   'auth.error.mnemonic': 'Failed to generate a valid mnemonic',
   'auth.error.noWallet': 'No wallet found on this device',
+  'auth.sessionExpired': 'Your session has expired. Please log in again.',
 
   'home.takBalance': 'TAK balance',
   'home.address': 'Address',

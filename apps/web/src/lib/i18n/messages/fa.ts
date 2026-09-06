@@ -30,6 +30,7 @@ const fa: Messages = {
   'auth.loggingIn': 'در حال ورود…',
   'auth.error.mnemonic': 'ساخت عبارت بازیابی معتبر ناموفق بود',
   'auth.error.noWallet': 'هیچ کیف پولی روی این دستگاه یافت نشد',
+  'auth.sessionExpired': 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
 
   'home.takBalance': 'موجودی TAK',
   'home.address': 'آدرس',

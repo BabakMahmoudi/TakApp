@@ -12,7 +12,7 @@ type Phase = 'welcome' | 'signup' | 'mnemonic' | 'login';
 type ErrorMessage = { message: string } | null;
 
 export default function AuthFlow() {
-  const { completeLogin } = useWallet();
+  const { completeLogin, authNotice, clearAuthNotice } = useWallet();
   const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>('welcome');
   const [busy, setBusy] = useState(false);
@@ -33,6 +33,7 @@ export default function AuthFlow() {
 
   async function runSignup(email: string, password: string): Promise<void> {
     setError(null);
+    clearAuthNotice();
     setBusy(true);
     try {
       const mnemonic = generateMnemonicPhrase();
@@ -82,6 +83,7 @@ export default function AuthFlow() {
 
   async function runLogin(password: string, publicKeyOverride?: string): Promise<void> {
     setError(null);
+    clearAuthNotice();
     setBusy(true);
     try {
       const wallet = await getWallet();
@@ -231,6 +233,7 @@ export default function AuthFlow() {
           </button>
         </form>
       )}
+      {authNotice && <p className="text-sm text-amber-400">{authNotice}</p>}
       {error && <p className="text-sm text-red-400">{error.message}</p>}
     </main>
   );

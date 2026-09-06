@@ -5,6 +5,10 @@ NETWORK_PASSPHRASE=Test SDF Network ; September 2015
 APP_DOMAIN=takapp.dev
 # Random string of at least 32 chars; used to sign SEP-10 session JWTs.
 JWT_SECRET=change-me-to-a-long-random-string-at-least-32-chars
+# Optional: session JWT lifetime in seconds. Defaults to 30 days (2592000).
+# The session token is read-only (never moves funds); shorten it to tighten the
+# bearer-token window at the cost of more frequent re-login.
+# SESSION_TTL_SECONDS=2592000
 # Testnet funding account. Create one, then fund it via Friendbot before local smoke tests:
 #   curl "https://friendbot.stellar.org?addr=<FUNDING_ACCOUNT_PUBLIC_KEY>"
 FUNDING_SECRET=S-REPLACE-WITH-TESTNET-FUNDING-ACCOUNT-SECRET

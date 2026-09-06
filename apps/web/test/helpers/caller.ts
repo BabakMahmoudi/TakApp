@@ -26,11 +26,17 @@ export const testEnv: WorkerEnv = {
 
 const callerFactory = appRouter.createCaller;
 
-export async function buildCaller(db: MockDb, publicKey: string, overrides: Partial<WorkerEnv> = {}) {
+export async function buildCaller(
+  db: MockDb,
+  publicKey: string,
+  overrides: Partial<WorkerEnv> = {},
+  ttlSeconds?: number,
+) {
   const token = await issueSessionToken({
     secret: testEnv.JWT_SECRET,
     publicKey,
     jti: `test-${Math.random().toString(36).slice(2)}`,
+    ...(ttlSeconds !== undefined ? { ttlSeconds } : {}),
   });
   const context: TrpcContext = {
     db: db as unknown as TrpcContext['db'],

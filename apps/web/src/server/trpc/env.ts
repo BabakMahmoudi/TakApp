@@ -10,6 +10,8 @@ export interface WorkerEnv {
   NETWORK_PASSPHRASE: string;
   APP_DOMAIN: string;
   JWT_SECRET: string;
+  /** Optional session JWT lifetime in seconds. Defaults to 30 days (see session-token.ts). */
+  SESSION_TTL_SECONDS?: string;
   FUNDING_SECRET: string;
   /** Casino/house account that signs TAK game payouts to winners, admin withdraws, and the one-time 3-TAK claim faucet. Env-only. */
   GAME_ACCOUNT_SECRET: string;

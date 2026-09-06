@@ -39,6 +39,12 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function isUnauthorizedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const data = (error as { data?: { code?: string; httpStatus?: number } }).data;
+  return data?.code === 'UNAUTHORIZED' || data?.httpStatus === 401;
+}
+
 export function useStellarWorker(): () => StellarWorkerClient {
   const workerRef = useRef<StellarWorkerClient | null>(null);
   return () => {
@@ -72,6 +78,8 @@ interface WalletContextValue {
   setError: (error: ErrorMessage) => void;
   passwordPromptOpen: boolean;
   passwordError: string | null;
+  authNotice: string | null;
+  clearAuthNotice: () => void;
   balanceQuery: UseTRPCQueryResult<BalanceData, ApiError>;
   networkConfigQuery: UseTRPCQueryResult<NetworkConfigData, ApiError>;
   adminStatusQuery: UseTRPCQueryResult<AdminStatusData, ApiError>;
@@ -101,6 +109,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<ErrorMessage>(null);
   const [passwordPromptOpen, setPasswordPromptOpen] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   const secretKeyRef = useRef<string | null>(null);
   const pendingPaymentRef = useRef<PaymentAction | null>(null);
@@ -125,6 +134,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (adminStatusQuery.error) console.warn('[admin.status]', adminStatusQuery.error);
   }, [adminStatusQuery.error]);
 
+  useEffect(() => {
+    if (!session || !isUnauthorizedError(balanceQuery.error)) return;
+    clearSession();
+    clearAdminToken();
+    secretKeyRef.current = null;
+    pendingPaymentRef.current = null;
+    setPasswordPromptOpen(false);
+    setPasswordError(null);
+    setError(null);
+    setAuthNotice(t('auth.sessionExpired'));
+    setSession(null);
+  }, [session, balanceQuery.error, t]);
+
   function completeLogin(token: string, publicKey: string, secretKey: string): void {
     saveSession({ token, publicKey });
     secretKeyRef.current = secretKey;
@@ -139,7 +161,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setPasswordPromptOpen(false);
     setPasswordError(null);
     setError(null);
+    setAuthNotice(null);
     setSession(null);
+  }
+
+  function clearAuthNotice(): void {
+    setAuthNotice(null);
   }
 
   function signPayment(action: PaymentAction): void {
@@ -255,6 +282,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setError,
     passwordPromptOpen,
     passwordError,
+    authNotice,
+    clearAuthNotice,
     balanceQuery,
     networkConfigQuery,
     adminStatusQuery,

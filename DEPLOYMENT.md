@@ -96,6 +96,7 @@ SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org"
 TAK_CONTRACT_ID = "CBI3WR5NQZUQ5PAPV4TBCOFMJ3MOJVZVMH5CKCGVOP63YV2SPFZN3Z7C"
 APP_DOMAIN = "takapp.dev"
 ADMIN_PUBLIC_KEY = "G-REPLACE-WITH-PREVIEW-ADMIN-PUBLIC-KEY"
+# SESSION_TTL_SECONDS = "2592000"  # optional, default 30 days
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "takapp-d1-preview"
@@ -111,6 +112,7 @@ SOROBAN_RPC_URL = "https://soroban.stellar.org"
 TAK_CONTRACT_ID = "<mainnet-tak-contract-id>"
 APP_DOMAIN = "takapp.dev"
 ADMIN_PUBLIC_KEY = "G-REPLACE-WITH-PRODUCTION-ADMIN-PUBLIC-KEY"
+# SESSION_TTL_SECONDS = "2592000"  # optional, default 30 days
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "takapp-d1-production"
@@ -189,6 +191,10 @@ Repeat with `--env production`.
 Optional web-worker vars (set in `[env.<name>.vars]`, not secrets):
 
 - `ADMIN_TOTP_REQUIRED` — set `"false"` to bypass the admin TOTP step-up (dev/staging only).
+- `SESSION_TTL_SECONDS` — session JWT lifetime in seconds (default 30 days). The
+  session token only authorizes read/history/profile actions and never moves
+  funds; shorten it to tighten the bearer-token window at the cost of more
+  frequent re-login.
 - `HORIZON_PUBLIC_URL` / `SOROBAN_PUBLIC_RPC_URL` — override the client-facing
   Stellar endpoints. When unset, the client uses the same-origin `/api/stellar/*` proxy.
 
@@ -294,6 +300,7 @@ wrangler rollback --env preview   # or --env production
 | `ADMIN_PUBLIC_KEY` | `[vars]` | no | First admin's Stellar public key |
 | `DEEPSEEK_BASE_URL` | `[vars]` (bot) | no | DeepSeek API base URL |
 | `JWT_SECRET` | secrets | yes | Signs SEP-10 session JWTs |
+| `SESSION_TTL_SECONDS` | `[vars]` | no | Optional session JWT lifetime in seconds (default 30 days) |
 | `FUNDING_SECRET` | secrets | yes | Funding account secret key |
 | `ADMIN_JWT_SECRET` | secrets | yes | Signs admin step-up JWTs |
 | `ADMIN_TOTP_ENC_KEY` | secrets | yes | AES-256-GCM key for TOTP secrets at rest |
