@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { lumensFromStroops } from '@takapp/shared/money';
-import { formatAmount, useI18n } from '../../lib/i18n';
+import { formatAmountLatin, useI18n } from '../../lib/i18n';
 import { trpc } from '../../lib/trpc/trpc';
 import { useWallet } from '../../lib/wallet-provider';
 import TakSymbol from '../../components/tak-symbol';
@@ -49,7 +49,7 @@ export default function WalletPage() {
                 <span className="flex items-center gap-2 text-coffee-300">
                   {entry.asset === 'TAK' ? <TakSymbol className="h-5 w-5" /> : entry.asset}
                 </span>
-                <span className="font-mono text-lg text-coffee-100">{formatAmount(locale, lumensFromStroops(entry.stroops))}</span>
+                <span className="font-mono text-lg text-coffee-100">{formatAmountLatin(lumensFromStroops(entry.stroops))}</span>
               </li>
             ))}
             {balanceQuery.data?.balances.length === 0 && (
@@ -94,7 +94,7 @@ export default function WalletPage() {
                   >
                     <span>
                       {tx.direction === 'in' ? '+' : '−'}
-                      {formatAmount(locale, lumensFromStroops(tx.amount))}
+                      {formatAmountLatin(lumensFromStroops(tx.amount))}
                     </span>
                     {tx.asset === 'TAK' ? (
                       <TakSymbol className="h-3.5 w-3.5" />

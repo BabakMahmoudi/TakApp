@@ -81,6 +81,12 @@ export default function HomeDashboard() {
 
       <section className="flex flex-col gap-3">
         <BuyCoffeeButton />
+        <Link
+          href="/games"
+          className="rounded-xl bg-coffee-900 p-6 shadow text-center text-lg font-semibold text-coffee-100"
+        >
+          {t('home.playToWin')}
+        </Link>
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/send"
