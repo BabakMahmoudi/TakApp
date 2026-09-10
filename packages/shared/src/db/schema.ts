@@ -234,6 +234,21 @@ export const takOffers = sqliteTable(
   }),
 );
 
+export const balanceCache = sqliteTable(
+  'balance_cache',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .unique()
+      .references(() => users.id),
+    takStroops: text('tak_stroops').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    userIdIdx: index('idx_balance_cache_user_id').on(t.userId),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type TelegramBinding = typeof telegramBindings.$inferSelect;
@@ -251,3 +266,4 @@ export type GamePlayStatus = GamePlay['status'];
 export type GamePlayType = GamePlay['playType'];
 export type AgentConversation = typeof agentConversations.$inferSelect;
 export type TakOffer = typeof takOffers.$inferSelect;
+export type BalanceCache = typeof balanceCache.$inferSelect;

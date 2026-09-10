@@ -10,9 +10,20 @@ import BuyCoffeeButton from './buy-coffee-button';
 import TakSymbol from './tak-symbol';
 
 export default function HomeDashboard() {
-  const { session, balanceQuery, error, setError } = useWallet();
+  const { session, error, setError } = useWallet();
   const { t } = useI18n();
+  const utils = trpc.useUtils();
   const meQuery = trpc.users.me.useQuery(undefined, { enabled: !!session, retry: false });
+  const takBalanceQuery = trpc.wallet.takBalance.useQuery(undefined, {
+    enabled: !!session,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const refreshTakBalance = trpc.wallet.refreshTakBalance.useMutation({
+    onSuccess: (data) => {
+      utils.wallet.takBalance.setData(undefined, { ...data, source: 'network' });
+    },
+  });
 
   const [copied, setCopied] = useState(false);
 
@@ -27,7 +38,8 @@ export default function HomeDashboard() {
     }
   }
 
-  const takBalance = balanceQuery.data?.balances.find((entry) => entry.asset === 'TAK');
+  const takStroops = takBalanceQuery.data?.takStroops ?? '0';
+  const refreshing = refreshTakBalance.isPending;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
@@ -35,16 +47,28 @@ export default function HomeDashboard() {
         <h2 className="text-sm font-medium text-coffee-300">
           {meQuery.data?.displayName ?? session?.publicKey.slice(0, 12) ?? '—'}
         </h2>
-        <p className="mt-2 flex items-center gap-2" dir="ltr">
-          <span className="text-5xl font-bold text-coffee-100">
-            {balanceQuery.isLoading
-              ? '…'
-              : balanceQuery.isError
-                ? '—'
-                : formatAmountLatin(lumensFromStroops(takBalance ? takBalance.stroops : '0'))}
-          </span>
-          <TakSymbol className="h-14 w-14" />
-        </p>
+        <div className="mt-2 flex items-center gap-2" dir="ltr">
+          <p className="flex items-center gap-2" dir="ltr">
+            <span className="text-5xl font-bold text-coffee-100">
+              {takBalanceQuery.isLoading
+                ? '…'
+                : takBalanceQuery.isError
+                  ? '—'
+                  : formatAmountLatin(lumensFromStroops(takStroops))}
+            </span>
+            <TakSymbol className="h-14 w-14" />
+          </p>
+          <button
+            type="button"
+            onClick={() => refreshTakBalance.mutate()}
+            disabled={refreshing}
+            aria-label={t('home.refresh')}
+            title={t('home.refresh')}
+            className="ml-auto rounded-md border border-coffee-700 px-3 py-1.5 text-xs text-coffee-200 disabled:opacity-50"
+          >
+            {refreshing ? '…' : t('home.refresh')}
+          </button>
+        </div>
         <h2 className="mt-6 text-sm font-medium text-coffee-300">{t('home.address')}</h2>
         <code className="mt-2 block break-all font-mono text-xs text-coffee-100">{session?.publicKey}</code>
         <button

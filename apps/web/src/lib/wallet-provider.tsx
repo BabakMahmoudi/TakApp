@@ -115,8 +115,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const pendingPaymentRef = useRef<PaymentAction | null>(null);
   const worker = useStellarWorker();
 
+  // Live balances are fetched on demand (wallet page, post-payment refresh) rather
+  // than eagerly on mount, so the home screen reads the cached TAK balance instead
+  // of hitting Stellar on every page open.
   const balanceQuery = trpc.wallet.balance.useQuery({}, {
-    enabled: !!session,
+    enabled: false,
     retry: false,
   });
   const networkConfigQuery = trpc.wallet.networkConfig.useQuery(undefined, {
@@ -127,6 +130,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     enabled: !!session,
     retry: false,
   });
+  const utils = trpc.useUtils();
   const recordPaymentMutation = trpc.payments.record.useMutation();
   const placeOrderMutation = trpc.orders.place.useMutation();
 
@@ -135,7 +139,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [adminStatusQuery.error]);
 
   useEffect(() => {
-    if (!session || !isUnauthorizedError(balanceQuery.error)) return;
+    if (!session || !isUnauthorizedError(adminStatusQuery.error)) return;
     clearSession();
     clearAdminToken();
     secretKeyRef.current = null;
@@ -145,7 +149,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setAuthNotice(t('auth.sessionExpired'));
     setSession(null);
-  }, [session, balanceQuery.error, t]);
+  }, [session, adminStatusQuery.error, t]);
 
   function completeLogin(token: string, publicKey: string, secretKey: string): void {
     saveSession({ token, publicKey });
@@ -243,6 +247,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         : { recipientPublicKey: input.recipientPublicKey }),
     });
     await balanceQuery.refetch();
+    await utils.wallet.takBalance.invalidate();
   }
 
   async function submitOrder(input: OrderInput): Promise<{ orderId: number; totalAmount: string }> {
@@ -267,11 +272,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       txHash,
     });
     await balanceQuery.refetch();
+    await utils.wallet.takBalance.invalidate();
     return result;
   }
 
   async function refetchBalances(): Promise<void> {
     await balanceQuery.refetch();
+    await utils.wallet.takBalance.invalidate();
   }
 
   const value: WalletContextValue = {

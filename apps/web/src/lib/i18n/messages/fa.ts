@@ -22,7 +22,7 @@ const fa: Messages = {
   'auth.savedContinue': 'ذخیره کردم — ادامه',
   'auth.tagline': 'قهوه شما، روی استلار.',
   'auth.slogan':
-    'تک — توکن قهوه\u200cی جامعه: روی هم بگذاریم، با هم بخریم، همه قهوه\u200cی بهتر را ارزان\u200cتر بنوشند.',
+    'تک، کوپن تخفیفی دیجیتالِ قهوه است؛ با قدرت خرید جمعی، قهوه\u200cی خوب را برای همه ارزان\u200cتر می\u200cکند.',
   'auth.findMore': 'بیشتر بدانید',
   'auth.createWallet': 'ساخت کیف پول',
   'auth.logIn': 'ورود',
@@ -39,6 +39,7 @@ const fa: Messages = {
   'home.address': 'آدرس',
   'home.copy': 'کپی',
   'home.copied': 'کپی شد',
+  'home.refresh': 'به‌روزرسانی',
   'home.buyCoffee': 'خرید قهوه',
   'home.send': 'ارسال',
   'home.get': 'دریافت',
@@ -118,6 +119,12 @@ const fa: Messages = {
   'wallet.noBalances': 'هنوز موجودی‌ای ثبت نشده',
   'wallet.getTak': 'دریافت TAK',
   'wallet.send': 'ارسال',
+  'wallet.history': 'تاریخچه',
+  'wallet.historyLoading': 'در حال بارگذاری تاریخچه…',
+  'wallet.noHistory': 'هنوز تراکنشی ثبت نشده',
+  'wallet.history.sent': 'ارسال',
+  'wallet.history.win': 'جایزه بازی',
+  'wallet.history.order': 'سفارش',
 
   'admin.notAuthorized': 'دسترسی مجاز نیست',
   'admin.title': 'مدیریت',
@@ -145,6 +152,7 @@ const fa: Messages = {
   'admin.saving': 'در حال ذخیره…',
   'admin.save': 'ذخیره',
   'admin.cancel': 'انصراف',
+  'admin.refresh': 'به‌روزرسانی',
   'admin.disabled': '(غیرفعال)',
   'admin.edit': 'ویرایش',
   'admin.disable': 'غیرفعال‌سازی',
@@ -219,6 +227,7 @@ const fa: Messages = {
   'ownerOrders.title': 'سفارش‌ها',
   'ownerOrders.loading': 'در حال بارگذاری سفارش‌ها…',
   'ownerOrders.noOrders': 'هنوز سفارشی ثبت نشده',
+  'ownerOrders.refresh': 'به‌روزرسانی',
   'ownerOrders.markReady': 'آماده شد',
   'ownerOrders.ready': 'آماده',
   'ownerOrders.newOrder': 'سفارش جدید',
@@ -322,7 +331,7 @@ const fa: Messages = {
   'agents.error': 'مشکلی پیش آمد',
   'agents.untitled': 'گفتگوی جدید',
   'agents.intro':
-    'تک یک توکنِ قهوه\u200cی جامعه بر بستر شبکه\u200cی استلار است. اعضا قدرت خریدشان را تجمیع می\u200cکنند تا قهوه را عمده بخرند و صرفه\u200cجویی را به\u200cصورت تخفیف واقعی در هر فنجان به خودشان برگردانند. هر سؤالی درباره\u200cی تک، نحوه\u200cی کارش یا کافه\u200cهای عضو دارید بپرسید.',
+    'تک کوپن تخفیفی دیجیتالِ قهوه است. با تجمیع قدرت خرید اعضا، قهوه را عمده می\u200cخریم و این صرفه\u200cجویی را به\u200cصورت تخفیف واقعی در هر فنجان به شما برمی\u200cگردانیم. هر سؤالی درباره\u200cی تک، نحوه\u200cی کارش یا کافه\u200cهای عضو دارید بپرسید.',
 };
 
 export default fa;

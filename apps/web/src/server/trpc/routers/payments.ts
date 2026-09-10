@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { coffeeShops, menuItems, payments, users } from '@takapp/shared/db';
 import { paymentRecordSchema } from '@takapp/shared/zod-schemas';
@@ -74,5 +74,41 @@ export const paymentsRouter = router({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to record payment' });
     }
     return { ok: true, id: row.id };
+  }),
+
+  history: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db
+      .select()
+      .from(payments)
+      .where(eq(payments.userId, ctx.user.id))
+      .orderBy(desc(payments.createdAt), desc(payments.id))
+      .limit(50);
+
+    const shopIds = [...new Set(rows.map((row) => row.coffeeShopId).filter((id): id is number => id !== null))];
+    let shopNames = new Map<number, string>();
+    if (shopIds.length > 0) {
+      const shopRows = await ctx.db.select().from(coffeeShops).where(inArray(coffeeShops.id, shopIds));
+      shopNames = new Map(shopRows.map((shop) => [shop.id, shop.name]));
+    }
+
+    const me = ctx.user.stellarPublicKey;
+    return {
+      transactions: rows.map((row) => {
+        const incoming = row.recipientPublicKey !== null && row.recipientPublicKey === me;
+        return {
+          id: row.id,
+          amount: row.amount,
+          asset: row.asset,
+          status: row.status,
+          createdAt: row.createdAt.getTime(),
+          direction: incoming ? 'in' : 'out',
+          kind: incoming ? 'win' : row.coffeeShopId !== null ? 'order' : 'send',
+          shopName: row.coffeeShopId !== null ? (shopNames.get(row.coffeeShopId) ?? null) : null,
+          recipientPublicKey: row.recipientPublicKey,
+          orderId: row.orderId,
+          txHash: row.txHash,
+        };
+      }),
+    };
   }),
 });

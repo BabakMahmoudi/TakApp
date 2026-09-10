@@ -133,8 +133,8 @@ function GameSettingsForm({ game, onSaved }: { game: AdminGame; onSaved: () => v
 export function GamesTab({ onAuthError }: { onAuthError: (error: unknown) => void }) {
   const { t, locale } = useI18n();
   const utils = trpc.useUtils();
-  const list = trpc.admin.games.list.useQuery(undefined, { retry: false });
-  const recent = trpc.admin.games.recentPlays.useQuery({ limit: 20 }, { retry: false });
+  const list = trpc.admin.games.list.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const recent = trpc.admin.games.recentPlays.useQuery({ limit: 20 }, { retry: false, refetchOnWindowFocus: false });
   const retry = trpc.admin.games.retryPayout.useMutation();
 
   useEffect(() => {
@@ -161,6 +161,19 @@ export function GamesTab({ onAuthError }: { onAuthError: (error: unknown) => voi
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            void list.refetch();
+            void recent.refetch();
+          }}
+          disabled={list.isFetching || recent.isFetching}
+          className="rounded-md border border-coffee-700 px-3 py-1.5 text-xs text-coffee-200 disabled:opacity-50"
+        >
+          {list.isFetching || recent.isFetching ? '…' : t('admin.refresh')}
+        </button>
+      </div>
       {fundsWarning && (
         <p className="rounded-md bg-red-900/40 p-2 text-xs text-red-200">
           {t('admin.games.fundsWarning')} ({formatAmount(locale, lumensFromStroops(casino!.takBalance))} /{' '}
@@ -210,7 +223,7 @@ export function GamesTab({ onAuthError }: { onAuthError: (error: unknown) => voi
 export function CasinoTab({ onAuthError }: { onAuthError: (error: unknown) => void }) {
   const { t, locale } = useI18n();
   const utils = trpc.useUtils();
-  const overview = trpc.admin.casino.get.useQuery(undefined, { retry: false });
+  const overview = trpc.admin.casino.get.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const withdraw = trpc.admin.casino.withdraw.useMutation();
   const [amount, setAmount] = useState('');
   const [destination, setDestination] = useState('');
@@ -246,6 +259,16 @@ export function CasinoTab({ onAuthError }: { onAuthError: (error: unknown) => vo
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => void overview.refetch()}
+          disabled={overview.isFetching}
+          className="rounded-md border border-coffee-700 px-3 py-1.5 text-xs text-coffee-200 disabled:opacity-50"
+        >
+          {overview.isFetching ? '…' : t('admin.refresh')}
+        </button>
+      </div>
       <div className="rounded-md bg-coffee-950 p-3 text-xs text-coffee-300">
         <p className="text-coffee-100">{t('admin.casino.publicKey')}</p>
         <p className="break-all font-mono text-[10px] text-coffee-400">{casino.publicKey}</p>

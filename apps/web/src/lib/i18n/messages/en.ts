@@ -20,7 +20,7 @@ const en = {
   'auth.savedContinue': 'I saved it — continue',
   'auth.tagline': 'Your coffee, on Stellar.',
   'auth.slogan':
-    'TAK — the community coffee token: pool together, buy together, everyone drinks better coffee for less.',
+    'TAK, the digital discount coupon for coffee — with collective buying power, good coffee becomes cheaper for everyone.',
   'auth.findMore': 'Find more',
   'auth.createWallet': 'Create a wallet',
   'auth.logIn': 'Log in',
@@ -37,6 +37,7 @@ const en = {
   'home.address': 'Address',
   'home.copy': 'Copy',
   'home.copied': 'Copied',
+  'home.refresh': 'Refresh',
   'home.buyCoffee': 'Buy Coffee',
   'home.send': 'Send',
   'home.get': 'Get',
@@ -116,6 +117,12 @@ const en = {
   'wallet.noBalances': 'No balances yet',
   'wallet.getTak': 'Get TAK',
   'wallet.send': 'Send',
+  'wallet.history': 'History',
+  'wallet.historyLoading': 'Loading history…',
+  'wallet.noHistory': 'No transactions yet',
+  'wallet.history.sent': 'Sent',
+  'wallet.history.win': 'Game prize',
+  'wallet.history.order': 'Order',
 
   'admin.notAuthorized': 'Not authorized',
   'admin.title': 'Admin',
@@ -143,6 +150,7 @@ const en = {
   'admin.saving': 'Saving…',
   'admin.save': 'Save',
   'admin.cancel': 'Cancel',
+  'admin.refresh': 'Refresh',
   'admin.disabled': '(disabled)',
   'admin.edit': 'Edit',
   'admin.disable': 'Disable',
@@ -217,6 +225,7 @@ const en = {
   'ownerOrders.title': 'Orders',
   'ownerOrders.loading': 'Loading orders…',
   'ownerOrders.noOrders': 'No orders yet',
+  'ownerOrders.refresh': 'Refresh',
   'ownerOrders.markReady': 'Mark ready',
   'ownerOrders.ready': 'Ready',
   'ownerOrders.newOrder': 'New order',
@@ -320,7 +329,7 @@ const en = {
   'agents.error': 'Something went wrong',
   'agents.untitled': 'New conversation',
   'agents.intro':
-    'TAK is a community coffee token on Stellar. Members pool their purchasing power to buy coffee in bulk and pass the savings back as real, per-cup discounts in local coffee shops. Ask me anything about TAK, how it works, or where you can use it.',
+    "TAK is the digital discount coupon for coffee. By pooling members' purchasing power, we buy coffee in bulk and return the savings to you as a real discount on every cup. Ask me anything about TAK, how it works, or the member coffee shops.",
 } as const;
 
 export type Messages = { [K in keyof typeof en]: string };

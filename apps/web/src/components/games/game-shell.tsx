@@ -5,6 +5,7 @@ import { lumensFromStroops } from '@takapp/shared/money';
 import { gameErrorKey, type GameKey, type GameParams } from '../../lib/games';
 import { formatAmount, useI18n } from '../../lib/i18n';
 import { trpc } from '../../lib/trpc/trpc';
+import { useWallet } from '../../lib/wallet-provider';
 import { SpinWheel } from './spin-wheel';
 import { StopClock } from './stop-clock';
 import { TapBean } from './tap-bean';
@@ -34,6 +35,7 @@ function typedCode(error: unknown): string | undefined {
 
 export function GameShell({ gameKey }: { gameKey: GameKey }) {
   const { t, locale } = useI18n();
+  const { refetchBalances } = useWallet();
   const utils = trpc.useUtils();
   const list = trpc.games.list.useQuery();
   const history = trpc.games.history.useQuery({}, { enabled: false });
@@ -100,7 +102,7 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
             setResult(data as FinishResult);
             setPhase('result');
             void utils.games.list.invalidate();
-            void utils.wallet.balance.invalidate();
+            void refetchBalances();
           },
           onError: (err) => {
             setError(t(gameErrorKey(typedCode(err))));
@@ -109,7 +111,7 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
         },
       );
     },
-    [active, finish, t, utils],
+    [active, finish, t, utils, refetchBalances],
   );
 
   if (list.isPending) {

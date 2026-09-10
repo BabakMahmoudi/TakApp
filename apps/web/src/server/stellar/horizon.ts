@@ -62,3 +62,25 @@ export async function fetchTakBalance(
   const tak = balances.find((entry) => entry.asset === 'TAK');
   return tak?.stroops ?? '0';
 }
+
+export async function fetchTakBalanceOnly(
+  rpc: SorobanRpcServer,
+  publicKey: string,
+  takContractId: string,
+): Promise<string> {
+  try {
+    const data = await rpc.getContractData(
+      takContractId,
+      takBalanceKey(publicKey),
+      Durability.Persistent,
+    );
+    const raw = scValToNative(data.val.contractData().val());
+    if (typeof raw === 'bigint') {
+      return stroopsFromTokenRaw(raw, TAK_DECIMALS);
+    }
+  } catch {
+    // TAK is best-effort: a fresh account has no Balance ledger entry and an
+    // RPC outage must not blank the read, so both degrade to zero here.
+  }
+  return '0';
+}

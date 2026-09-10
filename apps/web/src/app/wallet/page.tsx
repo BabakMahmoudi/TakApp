@@ -3,12 +3,15 @@
 import Link from 'next/link';
 import { lumensFromStroops } from '@takapp/shared/money';
 import { formatAmount, useI18n } from '../../lib/i18n';
+import { trpc } from '../../lib/trpc/trpc';
 import { useWallet } from '../../lib/wallet-provider';
 import TakSymbol from '../../components/tak-symbol';
 
 export default function WalletPage() {
-  const { session, balanceQuery } = useWallet();
+  const { session } = useWallet();
   const { locale, t } = useI18n();
+  const balanceQuery = trpc.wallet.balance.useQuery({}, { enabled: !!session, retry: false });
+  const historyQuery = trpc.payments.history.useQuery(undefined, { enabled: !!session, retry: false });
 
   if (!session) {
     return (
@@ -20,6 +23,14 @@ export default function WalletPage() {
       </main>
     );
   }
+
+  const formatTime = (ms: number): string =>
+    new Date(ms).toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: 'numeric',
+      month: 'short',
+    });
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
@@ -44,6 +55,56 @@ export default function WalletPage() {
             {balanceQuery.data?.balances.length === 0 && (
               <li className="py-3 text-coffee-300">{t('wallet.noBalances')}</li>
             )}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-xl bg-coffee-900 p-6 shadow">
+        <h2 className="text-sm font-medium text-coffee-300">{t('wallet.history')}</h2>
+        {historyQuery.isLoading ? (
+          <p className="mt-2 text-coffee-300">{t('wallet.historyLoading')}</p>
+        ) : historyQuery.isError ? (
+          <p className="mt-2 text-red-400">{historyQuery.error.message}</p>
+        ) : (historyQuery.data?.transactions.length ?? 0) === 0 ? (
+          <p className="mt-2 text-coffee-300">{t('wallet.noHistory')}</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-coffee-800">
+            {historyQuery.data?.transactions.map((tx) => {
+              const label =
+                tx.kind === 'order'
+                  ? (tx.shopName ?? t('wallet.history.order'))
+                  : tx.kind === 'win'
+                    ? t('wallet.history.win')
+                    : t('wallet.history.sent');
+              return (
+                <li key={tx.id} className="flex items-center justify-between gap-2 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-coffee-100">{label}</p>
+                    <p className="text-xs text-coffee-400">
+                      {formatTime(tx.createdAt)}
+                      {tx.kind === 'send' && tx.recipientPublicKey
+                        ? ` · ${tx.recipientPublicKey.slice(0, 12)}…`
+                        : ''}
+                    </p>
+                  </div>
+                  <p
+                    className={`flex shrink-0 items-center gap-1 font-mono text-sm ${
+                      tx.direction === 'in' ? 'text-green-300' : 'text-coffee-100'
+                    }`}
+                  >
+                    <span>
+                      {tx.direction === 'in' ? '+' : '−'}
+                      {formatAmount(locale, lumensFromStroops(tx.amount))}
+                    </span>
+                    {tx.asset === 'TAK' ? (
+                      <TakSymbol className="h-3.5 w-3.5" />
+                    ) : (
+                      <span className="text-xs">{tx.asset}</span>
+                    )}
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
