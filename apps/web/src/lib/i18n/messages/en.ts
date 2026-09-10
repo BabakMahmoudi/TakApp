@@ -19,6 +19,9 @@ const en = {
   'auth.working': 'Working…',
   'auth.savedContinue': 'I saved it — continue',
   'auth.tagline': 'Your coffee, on Stellar.',
+  'auth.slogan':
+    'TAK — the community coffee token: pool together, buy together, everyone drinks better coffee for less.',
+  'auth.findMore': 'Find more',
   'auth.createWallet': 'Create a wallet',
   'auth.logIn': 'Log in',
   'auth.email': 'Email',
@@ -85,6 +88,27 @@ const en = {
   'tak.claim.errors.notReady': 'The faucet is not ready yet',
   'tak.claim.errors.outOfFunds': 'The faucet is out of funds',
   'tak.claim.errors.claimFailed': 'Claim failed, please try again',
+
+  'tak.price.title': 'TAK Price',
+  'tak.price.noOffers': 'No offers yet',
+  'tak.offer.title': 'Sell TAK',
+  'tak.offer.priceLabel': 'Price (Rial per 1 TAK)',
+  'tak.offer.amountLabel': 'Amount (TAK)',
+  'tak.offer.amountOptional': 'Optional — leave blank for unlimited',
+  'tak.offer.memoLabel': 'Contact instructions',
+  'tak.offer.create': 'List offer',
+  'tak.offer.update': 'Update offer',
+  'tak.offer.renew': 'Renew',
+  'tak.offer.delete': 'Delete',
+  'tak.offer.unlimited': 'Unlimited',
+  'tak.offer.sellerFallback': 'Seller',
+  'tak.offer.rialPerTak': 'Rial / TAK',
+  'tak.offer.yourOffer': 'Your offer',
+  'tak.offer.expired': 'Expired',
+  'tak.offer.errors.offerNotFound': 'You have no active offer',
+  'tak.offer.errors.invalidPrice': 'Enter a whole Rial price greater than zero',
+  'tak.offer.errors.invalidAmount': 'Enter a valid TAK amount',
+  'tak.offer.errors.invalidMemo': 'Enter contact instructions',
 
   'wallet.title': 'Wallet',
   'wallet.balances': 'Balances',
@@ -295,6 +319,8 @@ const en = {
   'agents.thinking': 'Thinking…',
   'agents.error': 'Something went wrong',
   'agents.untitled': 'New conversation',
+  'agents.intro':
+    'TAK is a community coffee token on Stellar. Members pool their purchasing power to buy coffee in bulk and pass the savings back as real, per-cup discounts in local coffee shops. Ask me anything about TAK, how it works, or where you can use it.',
 } as const;
 
 export type Messages = { [K in keyof typeof en]: string };

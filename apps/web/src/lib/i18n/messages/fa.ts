@@ -21,6 +21,9 @@ const fa: Messages = {
   'auth.working': 'در حال انجام…',
   'auth.savedContinue': 'ذخیره کردم — ادامه',
   'auth.tagline': 'قهوه شما، روی استلار.',
+  'auth.slogan':
+    'تک — توکن قهوه\u200cی جامعه: روی هم بگذاریم، با هم بخریم، همه قهوه\u200cی بهتر را ارزان\u200cتر بنوشند.',
+  'auth.findMore': 'بیشتر بدانید',
   'auth.createWallet': 'ساخت کیف پول',
   'auth.logIn': 'ورود',
   'auth.email': 'ایمیل',
@@ -87,6 +90,27 @@ const fa: Messages = {
   'tak.claim.errors.notReady': 'فاست هنوز آماده نیست',
   'tak.claim.errors.outOfFunds': 'موجودی فاست کافی نیست',
   'tak.claim.errors.claimFailed': 'دریافت ناموفق بود، دوباره تلاش کنید',
+
+  'tak.price.title': 'قیمت TAK',
+  'tak.price.noOffers': 'هنوز پیشنهادی ثبت نشده',
+  'tak.offer.title': 'فروش TAK',
+  'tak.offer.priceLabel': 'قیمت (ریال به ازای ۱ TAK)',
+  'tak.offer.amountLabel': 'مقدار (TAK)',
+  'tak.offer.amountOptional': 'اختیاری — برای نامحدود خالی بگذارید',
+  'tak.offer.memoLabel': 'راهنمای تماس',
+  'tak.offer.create': 'ثبت پیشنهاد',
+  'tak.offer.update': 'به‌روزرسانی پیشنهاد',
+  'tak.offer.renew': 'تمدید',
+  'tak.offer.delete': 'حذف',
+  'tak.offer.unlimited': 'نامحدود',
+  'tak.offer.sellerFallback': 'فروشنده',
+  'tak.offer.rialPerTak': 'ریال / TAK',
+  'tak.offer.yourOffer': 'پیشنهاد شما',
+  'tak.offer.expired': 'منقضی شده',
+  'tak.offer.errors.offerNotFound': 'شما پیشنهاد فعالی ندارید',
+  'tak.offer.errors.invalidPrice': 'قیمت ریالی صحیح و بزرگ‌تر از صفر وارد کنید',
+  'tak.offer.errors.invalidAmount': 'مقدار TAK معتبر وارد کنید',
+  'tak.offer.errors.invalidMemo': 'راهنمای تماس را وارد کنید',
 
   'wallet.title': 'کیف پول',
   'wallet.balances': 'موجودی‌ها',
@@ -297,6 +321,8 @@ const fa: Messages = {
   'agents.thinking': 'در حال فکر کردن…',
   'agents.error': 'مشکلی پیش آمد',
   'agents.untitled': 'گفتگوی جدید',
+  'agents.intro':
+    'تک یک توکنِ قهوه\u200cی جامعه بر بستر شبکه\u200cی استلار است. اعضا قدرت خریدشان را تجمیع می\u200cکنند تا قهوه را عمده بخرند و صرفه\u200cجویی را به\u200cصورت تخفیف واقعی در هر فنجان به خودشان برگردانند. هر سؤالی درباره\u200cی تک، نحوه\u200cی کارش یا کافه\u200cهای عضو دارید بپرسید.',
 };
 
 export default fa;

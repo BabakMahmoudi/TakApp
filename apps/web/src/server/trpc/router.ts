@@ -2,6 +2,7 @@ import { adminRouter } from './routers/admin';
 import { agentsRouter } from './routers/agents';
 import { authRouter } from './routers/auth';
 import { gamesRouter } from './routers/games';
+import { offersRouter } from './routers/offers';
 import { ordersRouter } from './routers/orders';
 import { ownerRouter } from './routers/owner';
 import { paymentsRouter } from './routers/payments';
@@ -23,6 +24,7 @@ export const appRouter = router({
   admin: adminRouter,
   owner: ownerRouter,
   orders: ordersRouter,
+  offers: offersRouter,
   push: pushRouter,
   agents: agentsRouter,
 });

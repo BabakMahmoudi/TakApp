@@ -217,6 +217,23 @@ export const gamePlays = sqliteTable(
   }),
 );
 
+export const takOffers = sqliteTable(
+  'tak_offers',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sellerUserId: integer('seller_user_id').notNull().references(() => users.id),
+    priceRial: integer('price_rial').notNull(),
+    amountStroops: text('amount_stroops'),
+    memo: text('memo').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    sellerUnique: uniqueIndex('tak_offers_seller_user_id_unique').on(t.sellerUserId),
+    expiresIdx: index('idx_tak_offers_expires').on(t.expiresAt),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type TelegramBinding = typeof telegramBindings.$inferSelect;
@@ -233,3 +250,4 @@ export type GamePlay = typeof gamePlays.$inferSelect;
 export type GamePlayStatus = GamePlay['status'];
 export type GamePlayType = GamePlay['playType'];
 export type AgentConversation = typeof agentConversations.$inferSelect;
+export type TakOffer = typeof takOffers.$inferSelect;

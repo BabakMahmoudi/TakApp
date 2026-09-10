@@ -57,6 +57,13 @@
       "when": 1788647198603,
       "tag": "0007_nice_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788987032013,
+      "tag": "0008_hot_greymalkin",
+      "breakpoints": true
     }
   ]
 }

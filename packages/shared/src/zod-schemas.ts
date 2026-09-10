@@ -42,6 +42,17 @@ export const userSearchSchema = z.object({
   query: z.string().trim().min(1).max(60),
 });
 
+export const takOfferInputSchema = z
+  .object({
+    priceRial: z.number().int().positive().max(1_000_000_000),
+    amountStroops: stroopsStringSchema.optional(),
+    memo: z.string().trim().min(1).max(240),
+  })
+  .refine((v) => v.amountStroops === undefined || isPositiveStroops(v.amountStroops), {
+    message: 'Amount must be greater than zero',
+    path: ['amountStroops'],
+  });
+
 export const menuItemInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -128,6 +139,7 @@ export type AgentId = z.infer<typeof agentIdSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UserSearchInput = z.infer<typeof userSearchSchema>;
 export type MenuItemInput = z.infer<typeof menuItemInputSchema>;
+export type TakOfferInput = z.infer<typeof takOfferInputSchema>;
 export type ShopLocation = z.infer<typeof shopLocationSchema>;
 export type PaymentRecordInput = z.infer<typeof paymentRecordSchema>;
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;

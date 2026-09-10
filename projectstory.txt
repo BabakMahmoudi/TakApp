@@ -1,0 +1,12 @@
+We were sitting in a small café in Farahan (a region in Iran) one day. Someone in the group mentioned the wholesale price of coffee from an online source. We calculated that if we could buy one ton of coffee at that price, we could drink coffee at a reasonable cost until the end of the year, especially given the country's inflationary conditions, where prices keep rising day by day.
+
+The suggestion was made to pool our money together and buy coffee collectively. We would give the coffee to Alireza (the café owner) so he could serve it at a discount to those who had contributed. We decided to create discount coupons, and to ensure fairness, each person would receive coupons proportional to the amount they contributed.
+
+Someone suggested that the best way to do this would be to create these discount coupons digitally on a blockchain network. 
+Stellar network was considered the best option for this purpose. It was decided that we would write a small app to make working with Stellar wallets easier for the purchases.
+We created a token and named it TAK. TAK is the phrase customers use to order a single shot (TAK = Single) Espresso.
+
+We shared this idea with other Cafes in region and talked with others, they liked it, now we think that there is a good chance that our commmunity grow
+so that we can devlop the idea with other part of country. If we can convince others to invest in y buying tokens, we can buy or even import
+coffee and stup a low cost distribution all over the country. So that any TAK owner can enjoy cheap yet quality cofee in every coffe shop.
+

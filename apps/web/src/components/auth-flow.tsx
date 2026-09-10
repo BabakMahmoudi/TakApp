@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { decryptSecret, deriveEncryptionKey, encryptSecret, fromBase64, generateSalt, toBase64 } from '../lib/crypto';
 import { useI18n } from '../lib/i18n';
 import { generateMnemonicPhrase, isValidMnemonicPhrase } from '../lib/recovery';
@@ -145,6 +146,13 @@ export default function AuthFlow() {
       <div>
         <h1 className="text-3xl font-bold text-coffee-100">TakApp</h1>
         <p className="mt-1 text-coffee-300">{t('auth.tagline')}</p>
+        <p className="mt-4 text-lg font-medium leading-relaxed text-coffee-100">{t('auth.slogan')}</p>
+        <Link
+          href="/agents?intro=1"
+          className="mt-3 inline-block rounded-md border border-coffee-700 px-4 py-2 text-sm font-medium text-coffee-200"
+        >
+          {t('auth.findMore')}
+        </Link>
       </div>
       {phase === 'welcome' && (
         <div className="flex flex-col gap-3">

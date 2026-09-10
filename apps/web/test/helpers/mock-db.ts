@@ -6,6 +6,7 @@ export type MockCond =
   | { kind: 'ne'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'like'; column: SQLiteTableColumn; value: string }
   | { kind: 'inArray'; column: SQLiteTableColumn; values: unknown[] }
+  | { kind: 'gt'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'gte'; column: SQLiteTableColumn; value: unknown }
   | { kind: 'and'; conds: MockCond[] }
   | { kind: 'or'; conds: MockCond[] };
@@ -50,6 +51,11 @@ function evalCond(cond: MockCond, row: Record<string, unknown>): boolean {
     }
     case 'inArray':
       return cond.values.includes(row[key(cond.column)]);
+    case 'gt': {
+      const left = row[key(cond.column)];
+      const right = cond.value;
+      return orderCompare(left, right) > 0;
+    }
     case 'gte': {
       const left = row[key(cond.column)];
       const right = cond.value;

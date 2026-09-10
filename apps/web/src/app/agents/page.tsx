@@ -39,10 +39,30 @@ export default function AgentsPage() {
   const [streamingText, setStreamingText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const introSeededRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
+
+  useEffect(() => {
+    if (introSeededRef.current) return;
+    if (new URLSearchParams(window.location.search).get('intro') !== '1') return;
+    introSeededRef.current = true;
+    void (async () => {
+      try {
+        const created = await createMutation.mutateAsync({ agentId: AGENT_ID });
+        setActiveId(created.id);
+        setActiveMemoryId(created.memoryId);
+        const seeded: AgentMessage[] = [{ role: 'assistant', content: t('agents.intro') }];
+        setMessages(seeded);
+        saveMessages(created.memoryId, seeded);
+        await listQuery.refetch();
+      } catch {
+        setError(t('agents.error'));
+      }
+    })();
+  }, [createMutation, listQuery, t]);
 
   const conversations = listQuery.data?.conversations ?? [];
 
