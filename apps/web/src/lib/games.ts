@@ -9,8 +9,7 @@ export function isGameKey(value: string): value is GameKey {
 
 export type CommonSettings = {
   enabled: boolean;
-  freePlaysPerDay: number;
-  /** Fee for a paid play, in stroops (string). Unused in v1 (free plays only). */
+  /** Fee the player pays to the casino to start a play, in stroops (string). */
   paidPlayFee: string;
   maxPaidPlaysPerDay: number;
   /** Prize paid to a winner, in stroops (string). Must be >= 1 TAK. */
@@ -82,7 +81,6 @@ const STROOPS_PER_TAK = '10000000';
 
 const commonDefaults: CommonSettings = {
   enabled: true,
-  freePlaysPerDay: 3,
   paidPlayFee: STROOPS_PER_TAK,
   maxPaidPlaysPerDay: 100,
   prizeTak: STROOPS_PER_TAK,
@@ -98,7 +96,6 @@ export const defaultSettings: Record<GameKey, GameSettings> = {
 export const settingsFields: Record<GameKey, SettingField[]> = {
   spin: [
     { key: 'enabled', type: 'toggle', labelKey: 'games.fields.enabled' },
-    { key: 'freePlaysPerDay', type: 'number', labelKey: 'games.fields.freePlaysPerDay', min: 0, max: 100 },
     { key: 'paidPlayFee', type: 'tak', labelKey: 'games.fields.paidPlayFee' },
     { key: 'maxPaidPlaysPerDay', type: 'number', labelKey: 'games.fields.maxPaidPlaysPerDay', min: 0, max: 10000 },
     { key: 'prizeTak', type: 'tak', labelKey: 'games.fields.prizeTak' },
@@ -108,7 +105,6 @@ export const settingsFields: Record<GameKey, SettingField[]> = {
   ],
   tap: [
     { key: 'enabled', type: 'toggle', labelKey: 'games.fields.enabled' },
-    { key: 'freePlaysPerDay', type: 'number', labelKey: 'games.fields.freePlaysPerDay', min: 0, max: 100 },
     { key: 'paidPlayFee', type: 'tak', labelKey: 'games.fields.paidPlayFee' },
     { key: 'maxPaidPlaysPerDay', type: 'number', labelKey: 'games.fields.maxPaidPlaysPerDay', min: 0, max: 10000 },
     { key: 'prizeTak', type: 'tak', labelKey: 'games.fields.prizeTak' },
@@ -118,7 +114,6 @@ export const settingsFields: Record<GameKey, SettingField[]> = {
   ],
   clock: [
     { key: 'enabled', type: 'toggle', labelKey: 'games.fields.enabled' },
-    { key: 'freePlaysPerDay', type: 'number', labelKey: 'games.fields.freePlaysPerDay', min: 0, max: 100 },
     { key: 'paidPlayFee', type: 'tak', labelKey: 'games.fields.paidPlayFee' },
     { key: 'maxPaidPlaysPerDay', type: 'number', labelKey: 'games.fields.maxPaidPlaysPerDay', min: 0, max: 10000 },
     { key: 'prizeTak', type: 'tak', labelKey: 'games.fields.prizeTak' },
@@ -190,8 +185,10 @@ export function gameErrorKey(typedCode: string | undefined): keyof Messages {
       return 'games.errors.playNotPending';
     case 'INVALID_PERFORMANCE':
       return 'games.errors.invalidPerformance';
-    case 'DAILY_PLAY_LIMIT':
-      return 'games.errors.dailyLimit';
+    case 'FEE_ALREADY_USED':
+      return 'games.errors.feeAlreadyUsed';
+    case 'FEE_REQUIRED':
+      return 'games.errors.feeRequired';
     case 'PAYOUT_FAILED':
       return 'games.errors.payoutFailed';
     default:

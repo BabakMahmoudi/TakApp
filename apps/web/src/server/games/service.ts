@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { Horizon, Keypair } from '@stellar/stellar-sdk/no-axios';
@@ -47,7 +47,8 @@ export type GameErrorCode =
   | 'PLAY_EXPIRED'
   | 'PLAY_NOT_PENDING'
   | 'INVALID_PERFORMANCE'
-  | 'DAILY_PLAY_LIMIT'
+  | 'FEE_REQUIRED'
+  | 'FEE_ALREADY_USED'
   | 'PAYOUT_FAILED'
   | 'INTERNAL';
 
@@ -99,8 +100,6 @@ export async function withGameErrors<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-const SETTLED_STATUSES = ['won', 'lost', 'payout_failed'];
-
 const stroopsSchema = z.string().regex(/^\d+$/);
 const prizeTakSchema = stroopsSchema.refine(
   (value) => compareStroops(value, '10000000') >= 0,
@@ -109,7 +108,6 @@ const prizeTakSchema = stroopsSchema.refine(
 
 const commonSettingsSchema = z.object({
   enabled: z.boolean(),
-  freePlaysPerDay: z.number().int().min(0).max(100),
   paidPlayFee: stroopsSchema,
   maxPaidPlaysPerDay: z.number().int().min(0).max(10000),
   prizeTak: prizeTakSchema,
@@ -150,20 +148,6 @@ export const settingsSchemaByGame: Record<GameKey, z.ZodType<GameSettings>> = {
 const spinPerformanceSchema = z.object({ ack: z.literal(true) });
 const tapPerformanceSchema = z.object({ taps: z.number().int().min(0) });
 const clockPerformanceSchema = z.object({ elapsedMs: z.number().int().min(0) });
-export function playDayStart(now: Date = new Date()): Date {
-  const values: Record<string, string> = {};
-  for (const part of new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tehran',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now)) {
-    values[part.type] = part.value;
-  }
-  return new Date(
-    Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), 3, 30),
-  );
-}
 
 function randomInt(maxExclusive: number): number {
   const buf = new Uint32Array(1);
@@ -271,37 +255,6 @@ export function isValidPerformance(
   }
 }
 
-async function countSettledFreePlays(
-  db: Db,
-  userId: number,
-  gameKey: GameKey,
-  dayStart: Date,
-): Promise<number> {
-  const rows = await db
-    .select()
-    .from(gamePlays)
-    .where(
-      and(
-        eq(gamePlays.userId, userId),
-        eq(gamePlays.gameKey, gameKey),
-        eq(gamePlays.playType, 'free'),
-        inArray(gamePlays.status, SETTLED_STATUSES),
-        gte(gamePlays.createdAt, dayStart),
-      ),
-    );
-  return rows.length;
-}
-
-async function getFreePlaysRemaining(
-  db: Db,
-  userId: number,
-  gameKey: GameKey,
-  settings: GameSettings,
-): Promise<number> {
-  const settled = await countSettledFreePlays(db, userId, gameKey, playDayStart());
-  return Math.max(0, settings.freePlaysPerDay - settled);
-}
-
 async function getUserPublicKey(db: Db, userId: number): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new GameError('Winner not found', 'PAYOUT_FAILED');
@@ -349,23 +302,22 @@ export type FinishResult = {
   outcome: 'won' | 'lost' | 'abandoned' | 'payout_failed';
   prize: string;
   score: number | null;
-  freePlaysRemaining: number;
 };
 
-async function storedResult(db: Db, play: GamePlay): Promise<FinishResult> {
-  const gameKey = isGameKey(play.gameKey) ? play.gameKey : null;
-  const settings = gameKey ? await getSettings(db, gameKey) : null;
+async function storedResult(play: GamePlay): Promise<FinishResult> {
   return {
     playId: play.id,
     outcome: play.status as FinishResult['outcome'],
     prize: play.status === 'won' ? (play.prize ?? '0') : '0',
     score: play.score,
-    freePlaysRemaining:
-      gameKey && settings ? await getFreePlaysRemaining(db, play.userId, gameKey, settings) : 0,
   };
 }
 
-export async function startGame(db: Db, env: GamesEnv, input: { userId: number; gameKey: string }) {
+export async function startGame(
+  db: Db,
+  env: GamesEnv,
+  input: { userId: number; gameKey: string; feeTxHash: string },
+) {
   if (!isGameKey(input.gameKey)) {
     throw new GameError('Unknown game', 'INVALID_GAME');
   }
@@ -380,7 +332,6 @@ export async function startGame(db: Db, env: GamesEnv, input: { userId: number; 
     throw new GameError('Casino cannot cover the prize', 'GAME_OUT_OF_FUNDS');
   }
 
-  const dayStart = playDayStart();
   const pending = await db
     .select()
     .from(gamePlays)
@@ -406,20 +357,35 @@ export async function startGame(db: Db, env: GamesEnv, input: { userId: number; 
       .where(eq(gamePlays.id, current.id));
   }
 
-  const settledFreeCount = await countSettledFreePlays(db, input.userId, gameKey, dayStart);
-  // v1 is free-play only: once the free quota is exhausted there is no paid path.
-  if (settledFreeCount >= settings.freePlaysPerDay) {
-    throw new GameError('Daily play limit reached', 'DAILY_PLAY_LIMIT');
+  if (!/^[0-9a-fA-F]{64}$/.test(input.feeTxHash)) {
+    throw new GameError('A payment is required to play', 'FEE_REQUIRED');
+  }
+
+  const now = new Date();
+  const [fee] = await db
+    .insert(payments)
+    .values({
+      userId: input.userId,
+      recipientPublicKey: casino.publicKey,
+      amount: settings.paidPlayFee,
+      asset: 'TAK',
+      txHash: input.feeTxHash,
+      status: 'submitted',
+      createdAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!fee) {
+    throw new GameError('This payment was already used', 'FEE_ALREADY_USED');
   }
 
   const params = createParams(gameKey, settings);
-  const now = new Date();
   const [play] = await db
     .insert(gamePlays)
     .values({
       gameKey,
       userId: input.userId,
-      playType: 'free',
+      playType: 'paid',
       status: 'pending',
       params: JSON.stringify(params),
       prize: settings.prizeTak,
@@ -435,9 +401,8 @@ export async function startGame(db: Db, env: GamesEnv, input: { userId: number; 
   return {
     playId: play.id,
     gameKey,
-    playType: 'free' as const,
+    playType: 'paid' as const,
     params,
-    freePlaysRemaining: Math.max(0, settings.freePlaysPerDay - settledFreeCount),
   };
 }
 
@@ -456,7 +421,7 @@ export async function finishGame(
     throw new GameError('Play not found', 'PLAY_NOT_FOUND');
   }
   if (play.status !== 'pending') {
-    return storedResult(db, play);
+    return storedResult(play);
   }
   if (!isGameKey(play.gameKey)) {
     throw new GameError('Unknown game', 'INVALID_GAME');
@@ -476,7 +441,6 @@ export async function finishGame(
       outcome: 'abandoned',
       prize: '0',
       score: null,
-      freePlaysRemaining: await getFreePlaysRemaining(db, input.userId, gameKey, settings),
     };
   }
 
@@ -503,7 +467,6 @@ export async function finishGame(
       outcome: 'lost',
       prize: '0',
       score: result.score,
-      freePlaysRemaining: await getFreePlaysRemaining(db, input.userId, gameKey, settings),
     };
   }
 
@@ -555,7 +518,6 @@ export async function finishGame(
     outcome: 'won',
     prize,
     score: result.score,
-    freePlaysRemaining: await getFreePlaysRemaining(db, input.userId, gameKey, settings),
   };
 }
 
@@ -580,21 +542,26 @@ export async function getGameHistory(db: Db, userId: number, limit = 20) {
   }));
 }
 
-export async function listGames(db: Db, userId: number) {
-  const dayStart = playDayStart();
+export async function listGames(db: Db, env: GamesEnv) {
+  let casino: { publicKey: string; takBalance: string };
+  try {
+    casino = await getCasinoWithBalance(env);
+  } catch {
+    casino = { publicKey: '', takBalance: '0' };
+  }
   const entries = await Promise.all(
     GAME_KEYS.map(async (gameKey) => {
       const settings = await getSettings(db, gameKey);
       if (!settings.enabled) return null;
       const descriptor = getGameDescriptor(gameKey);
-      const settledFreeCount = await countSettledFreePlays(db, userId, gameKey, dayStart);
       return {
         gameKey,
         titleKey: descriptor.titleKey,
         descriptionKey: descriptor.descriptionKey,
         settings,
-        freePlaysUsed: settledFreeCount,
-        freePlaysRemaining: Math.max(0, settings.freePlaysPerDay - settledFreeCount),
+        casinoPublicKey: casino.publicKey,
+        playable:
+          casino.publicKey !== '' && compareStroops(casino.takBalance, settings.prizeTak) >= 0,
       };
     }),
   );

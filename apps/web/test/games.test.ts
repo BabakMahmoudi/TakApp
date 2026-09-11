@@ -9,7 +9,6 @@ import {
   GameError,
   finishGame,
   isValidPerformance,
-  playDayStart,
   retryPayoutForAdmin,
   settingsSchemaByGame,
   startGame,
@@ -40,6 +39,7 @@ vi.mock('../src/server/stellar/tak-transfer', () => ({
 const casinoKeypair = Keypair.random();
 const USER_ID = 1;
 const USER_PUBLIC_KEY = `G${'U'.repeat(55)}`;
+const FEE_HASH = 'f'.repeat(64);
 
 function user() {
   return {
@@ -59,7 +59,6 @@ function user() {
 function spinSettings(overrides: Record<string, unknown> = {}) {
   return {
     enabled: true,
-    freePlaysPerDay: 3,
     paidPlayFee: '10000000',
     maxPaidPlaysPerDay: 100,
     prizeTak: '10000000',
@@ -75,7 +74,7 @@ function makeDb(overrides: { gameSettings?: Record<string, unknown>[]; gamePlays
     users: { rows: [user()] },
     game_settings: { rows: overrides.gameSettings ?? [] },
     game_plays: { rows: overrides.gamePlays ?? [] },
-    payments: { rows: overrides.payments ?? [] },
+    payments: { rows: overrides.payments ?? [], unique: ['txHash'] },
     admin_audit_log: { rows: [] },
   };
   return new MockDb(tables);
@@ -139,19 +138,6 @@ describe('gameErrorKey', () => {
   it('falls back to a generic key for unknown codes', () => {
     expect(gameErrorKey(undefined)).toBe('errors.generic');
     expect(gameErrorKey('NOPE')).toBe('errors.generic');
-  });
-});
-
-describe('playDayStart', () => {
-  it('is deterministic for the same instant', () => {
-    const instant = new Date('2026-01-01T12:00:00Z');
-    expect(playDayStart(instant).getTime()).toBe(playDayStart(instant).getTime());
-  });
-
-  it('returns the Tehran day-start boundary (03:30 UTC)', () => {
-    const start = playDayStart(new Date('2026-01-01T12:00:00Z'));
-    expect(start.getUTCHours()).toBe(3);
-    expect(start.getUTCMinutes()).toBe(30);
   });
 });
 
@@ -219,14 +205,14 @@ describe('startGame', () => {
         { id: 1, gameKey: 'spin', settings: JSON.stringify(spinSettings({ enabled: false })), updatedByUserId: null, updatedAt: new Date() },
       ],
     });
-    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin' }));
+    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH }));
     expect(code).toBe('GAME_DISABLED');
   });
 
   it('rejects when the casino secret is invalid', async () => {
     const db = makeDb();
     const code = await gameErrorCode(
-      startGame(asDb(db), makeEnv({ GAME_ACCOUNT_SECRET: 'not-a-secret' }), { userId: USER_ID, gameKey: 'spin' }),
+      startGame(asDb(db), makeEnv({ GAME_ACCOUNT_SECRET: 'not-a-secret' }), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH }),
     );
     expect(code).toBe('GAME_ACCOUNT_NOT_READY');
   });
@@ -234,32 +220,41 @@ describe('startGame', () => {
   it('rejects when the casino cannot cover the prize', async () => {
     vi.mocked(fetchTakBalance).mockResolvedValue('9999999');
     const db = makeDb();
-    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin' }));
+    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH }));
     expect(code).toBe('GAME_OUT_OF_FUNDS');
   });
 
-  it('rejects when the daily free limit is reached', async () => {
-    // createdAt is pushed into the future so it is always >= the Tehran day-start
-    // boundary regardless of the machine's timezone.
-    const settled = new Date(Date.now() + 24 * 3600 * 1000);
-    const plays = [0, 1, 2].map((i) => ({
-      id: i + 1,
-      gameKey: 'spin',
+  it('rejects a missing or malformed fee payment', async () => {
+    const db = makeDb();
+    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: 'not-a-hash' }));
+    expect(code).toBe('FEE_REQUIRED');
+  });
+
+  it('records the fee payment and starts a paid play', async () => {
+    const db = makeDb();
+    const result = await startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH });
+    expect(result.playType).toBe('paid');
+    expect(db.table('payments').rows).toHaveLength(1);
+    expect(db.table('payments').rows[0]).toMatchObject({
       userId: USER_ID,
-      playType: 'free',
-      status: 'won',
-      params: JSON.stringify({ game: 'spin', outcomeIndex: 0, segments: 8, winSegments: 1 }),
-      performance: null,
-      score: null,
-      prize: '10000000',
-      payoutTxHash: null,
-      startedAt: settled,
-      settledAt: settled,
-      createdAt: settled,
-    }));
-    const db = makeDb({ gamePlays: plays });
-    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin' }));
-    expect(code).toBe('DAILY_PLAY_LIMIT');
+      recipientPublicKey: casinoKeypair.publicKey(),
+      amount: '10000000',
+      asset: 'TAK',
+      txHash: FEE_HASH,
+    });
+    const play = db.table('game_plays').rows[0];
+    expect(play?.playType).toBe('paid');
+    expect(play?.status).toBe('pending');
+  });
+
+  it('rejects a fee payment that was already used', async () => {
+    const db = makeDb({
+      payments: [
+        { id: 1, userId: USER_ID, recipientPublicKey: casinoKeypair.publicKey(), amount: '10000000', asset: 'TAK', txHash: FEE_HASH, status: 'submitted', createdAt: new Date() },
+      ],
+    });
+    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH }));
+    expect(code).toBe('FEE_ALREADY_USED');
   });
 
   it('rejects with GAME_IN_PROGRESS when a fresh pending play exists', async () => {
@@ -269,7 +264,7 @@ describe('startGame', () => {
           id: 1,
           gameKey: 'spin',
           userId: USER_ID,
-          playType: 'free',
+          playType: 'paid',
           status: 'pending',
           params: JSON.stringify({ game: 'spin', outcomeIndex: 0, segments: 8, winSegments: 1 }),
           performance: null,
@@ -282,7 +277,7 @@ describe('startGame', () => {
         },
       ],
     });
-    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin' }));
+    const code = await gameErrorCode(startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH }));
     expect(code).toBe('GAME_IN_PROGRESS');
   });
 
@@ -293,7 +288,7 @@ describe('startGame', () => {
           id: 1,
           gameKey: 'spin',
           userId: USER_ID,
-          playType: 'free',
+          playType: 'paid',
           status: 'pending',
           params: JSON.stringify({ game: 'spin', outcomeIndex: 0, segments: 8, winSegments: 1 }),
           performance: null,
@@ -306,7 +301,7 @@ describe('startGame', () => {
         },
       ],
     });
-    const result = await startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin' });
+    const result = await startGame(asDb(db), makeEnv(), { userId: USER_ID, gameKey: 'spin', feeTxHash: FEE_HASH });
     expect(result.playId).toBe(2);
     const rows = db.table('game_plays').rows;
     expect(rows.find((row) => row.id === 1)?.status).toBe('abandoned');

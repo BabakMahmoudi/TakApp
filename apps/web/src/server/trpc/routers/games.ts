@@ -4,13 +4,19 @@ import { protectedProcedure, router } from '../trpc';
 
 export const gamesRouter = router({
   list: protectedProcedure.query(({ ctx }) =>
-    withGameErrors(() => listGames(ctx.db, ctx.user.id)),
+    withGameErrors(() => listGames(ctx.db, ctx.env)),
   ),
 
   start: protectedProcedure
-    .input(z.object({ gameKey: z.string().min(1) }))
+    .input(z.object({ gameKey: z.string().min(1), feeTxHash: z.string().min(1) }))
     .mutation(({ ctx, input }) =>
-      withGameErrors(() => startGame(ctx.db, ctx.env, { userId: ctx.user.id, gameKey: input.gameKey })),
+      withGameErrors(() =>
+        startGame(ctx.db, ctx.env, {
+          userId: ctx.user.id,
+          gameKey: input.gameKey,
+          feeTxHash: input.feeTxHash,
+        }),
+      ),
     ),
 
   finish: protectedProcedure

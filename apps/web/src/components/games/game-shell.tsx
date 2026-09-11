@@ -5,16 +5,16 @@ import { lumensFromStroops } from '@takapp/shared/money';
 import { gameErrorKey, type GameKey, type GameParams } from '../../lib/games';
 import { formatAmount, useI18n } from '../../lib/i18n';
 import { trpc } from '../../lib/trpc/trpc';
-import { useWallet } from '../../lib/wallet-provider';
+import { ATTEMPT_TIMEOUT_MS, useStellarWorker, useWallet, withTimeout } from '../../lib/wallet-provider';
 import { SpinWheel } from './spin-wheel';
 import { StopClock } from './stop-clock';
 import { TapBean } from './tap-bean';
 
-type Phase = 'idle' | 'starting' | 'playing' | 'settling' | 'result';
+type Phase = 'idle' | 'paying' | 'starting' | 'playing' | 'settling' | 'result';
 
 type ActivePlay = {
   playId: number;
-  playType: 'free' | 'paid';
+  playType: 'paid';
   params: GameParams;
 };
 
@@ -23,19 +23,18 @@ type FinishResult = {
   outcome: 'won' | 'lost' | 'abandoned' | 'payout_failed';
   prize: string;
   score: number | null;
-  freePlaysRemaining: number;
 };
 
 function typedCode(error: unknown): string | undefined {
   // The server encodes the GameError typed code in `error.message` (see
   // `toTrpcGameError`); `gameErrorKey` maps it to an i18n key.
-  const message = error instanceof Error ? error.message : undefined;
-  return message;
+  return error instanceof Error ? error.message : undefined;
 }
 
 export function GameShell({ gameKey }: { gameKey: GameKey }) {
   const { t, locale } = useI18n();
-  const { refetchBalances } = useWallet();
+  const worker = useStellarWorker();
+  const { networkConfigQuery, refetchBalances, signPayment } = useWallet();
   const utils = trpc.useUtils();
   const list = trpc.games.list.useQuery();
   const history = trpc.games.history.useQuery({}, { enabled: false });
@@ -57,7 +56,7 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
       if (pending) {
         setActive({
           playId: pending.id,
-          playType: pending.playType as 'free' | 'paid',
+          playType: pending.playType as 'paid',
           params: pending.params as GameParams,
         });
         setPhase('playing');
@@ -67,11 +66,10 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
     });
   }
 
-  function handlePlay() {
-    setError(null);
+  function beginPlay(feeTxHash: string) {
     setPhase('starting');
     start.mutate(
-      { gameKey },
+      { gameKey, feeTxHash },
       {
         onSuccess: (data) => {
           setActive({ playId: data.playId, playType: data.playType, params: data.params });
@@ -88,6 +86,40 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
         },
       },
     );
+  }
+
+  async function payFeeAndStart(secretKey: string): Promise<void> {
+    const config = networkConfigQuery.data;
+    if (!config || !game) {
+      setError(t(gameErrorKey('GAME_ACCOUNT_NOT_READY')));
+      setPhase('idle');
+      return;
+    }
+    try {
+      const txHash = await withTimeout(
+        worker().submitPayment({
+          secretKey,
+          destination: game.casinoPublicKey,
+          contractId: config.takToken.contractId,
+          amountRaw: game.settings.paidPlayFee,
+          rpcUrl: config.sorobanRpcUrl,
+          horizonUrl: config.horizonUrl,
+          networkPassphrase: config.networkPassphrase,
+        }),
+        ATTEMPT_TIMEOUT_MS,
+      );
+      void refetchBalances();
+      beginPlay(txHash);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setPhase('idle');
+    }
+  }
+
+  function handlePlay() {
+    setError(null);
+    setPhase('paying');
+    signPayment((secretKey) => payFeeAndStart(secretKey));
   }
 
   const handleFinish = useCallback(
@@ -122,8 +154,6 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
     return <p className="opacity-60">{t('games.errors.disabled')}</p>;
   }
 
-  const freeLeft = game.freePlaysRemaining;
-
   function playAgain() {
     setResult(null);
     setActive(null);
@@ -152,9 +182,6 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
             {t('games.resultScore')}: {result.score}
           </p>
         )}
-        <p className="text-sm opacity-70">
-          {t('games.freePlaysLeft')}: {result.freePlaysRemaining}
-        </p>
         <button
           type="button"
           onClick={playAgain}
@@ -180,7 +207,8 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
     );
   }
 
-  const playDisabled = phase === 'starting' || phase === 'settling' || freeLeft <= 0;
+  const busy = phase === 'paying' || phase === 'starting' || phase === 'settling';
+  const playDisabled = busy || !game.playable;
 
   return (
     <section className="flex flex-col gap-4">
@@ -189,26 +217,28 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
         <p className="mt-1 text-sm opacity-70">{t(game.descriptionKey)}</p>
       </div>
       <div className="flex flex-col gap-3 rounded-2xl bg-coffee-900 p-4 shadow">
-        <p className="text-sm opacity-70">
-          {freeLeft > 0 ? `${t('games.freePlaysLeft')}: ${freeLeft}` : t('games.freePlaysUsed')}
-        </p>
-        {freeLeft > 0 ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
+          <span>
+            {t('games.playFee')}: {formatAmount(locale, lumensFromStroops(game.settings.paidPlayFee))} TAK
+          </span>
+          <span>
+            {t('games.winPrize')}: {formatAmount(locale, lumensFromStroops(game.settings.prizeTak))} TAK
+          </span>
+        </div>
+        {game.playable ? (
           <button
             type="button"
             onClick={handlePlay}
             disabled={playDisabled}
             className="rounded-xl bg-coffee-600 px-6 py-4 font-semibold text-coffee-50 disabled:opacity-40"
           >
-            {phase === 'starting' ? t('games.starting') : t('games.playFree')}
+            {phase === 'paying' ? t('games.paying') : phase === 'starting' ? t('games.starting') : t('games.payAndPlay')}
           </button>
         ) : (
           <button type="button" disabled className="rounded-xl bg-coffee-800 px-6 py-4 font-semibold opacity-60">
-            {t('games.dailyLimit')}
+            {t('games.errors.outOfFunds')}
           </button>
         )}
-        <p className="text-center text-xs opacity-60">
-          {t('games.winPrize')}: {formatAmount(locale, lumensFromStroops(game.settings.prizeTak))} TAK
-        </p>
       </div>
       {error && <p className="rounded-xl bg-red-900/40 p-3 text-sm text-red-200">{error}</p>}
     </section>

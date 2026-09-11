@@ -33,9 +33,7 @@ export function GamesLobby() {
           <p className="text-sm opacity-70">{t(game.descriptionKey)}</p>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
             <span>
-              {game.freePlaysRemaining > 0
-                ? `${t('games.freePlaysLeft')}: ${game.freePlaysRemaining}`
-                : t('games.freePlaysUsed')}
+              {t('games.playFee')}: {formatAmount(locale, lumensFromStroops(game.settings.paidPlayFee))} TAK
             </span>
             <span>
               {t('games.winPrize')}: {formatAmount(locale, lumensFromStroops(game.settings.prizeTak))} TAK

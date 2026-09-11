@@ -18,6 +18,8 @@ export default function AuthFlow() {
   const [phase, setPhase] = useState<Phase>('welcome');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const flowRef = useRef<{ publicKey: string; secretKey: string; mnemonic: string } | null>(null);
   const credentialsRef = useRef<{ email: string; password: string } | null>(null);
@@ -44,6 +46,8 @@ export default function AuthFlow() {
       const { publicKey, secretKey } = await worker().deriveFromMnemonic(mnemonic);
       flowRef.current = { publicKey, secretKey, mnemonic };
       credentialsRef.current = { email, password };
+      setRevealed(false);
+      setCopied(false);
       setPhase('mnemonic');
     } catch (cause) {
       setError({ message: cause instanceof Error ? cause.message : String(cause) });
@@ -115,28 +119,54 @@ export default function AuthFlow() {
     }
   }
 
+  async function copySecret(): Promise<void> {
+    const flow = flowRef.current;
+    if (!flow) return;
+    try {
+      await navigator.clipboard.writeText(flow.mnemonic);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError({ message: t('auth.error.copyFailed') });
+    }
+  }
+
   if (phase === 'mnemonic') {
-    const words = flowRef.current?.mnemonic.split(' ') ?? [];
+    const mnemonic = flowRef.current?.mnemonic ?? '';
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-6">
         <h1 className="text-xl font-semibold text-coffee-200">{t('auth.recoveryTitle')}</h1>
-        <p className="text-sm text-coffee-300">
-          {t('auth.recoveryBody')}
-        </p>
-        <ol className="grid grid-cols-2 gap-2">
-          {words.map((word, index) => (
-            <li key={`${word}-${index}`} className="rounded-md bg-coffee-900 px-3 py-2 font-mono text-coffee-100">
-              {index + 1}. {word}
-            </li>
-          ))}
-        </ol>
-        <button
-          onClick={() => void confirmMnemonic()}
-          disabled={busy}
-          className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50 disabled:opacity-50"
-        >
-          {busy ? t('auth.working') : t('auth.savedContinue')}
-        </button>
+        <p className="text-sm leading-relaxed text-coffee-300">{t('auth.recoveryBody')}</p>
+        {!revealed ? (
+          <button
+            onClick={() => setRevealed(true)}
+            className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50"
+          >
+            {t('auth.revealButton')}
+          </button>
+        ) : (
+          <>
+            <p className="break-words rounded-md bg-coffee-900 px-4 py-3 font-mono text-sm leading-relaxed text-coffee-100">
+              {mnemonic}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => void copySecret()}
+                className="rounded-md border border-coffee-700 px-4 py-2.5 font-medium text-coffee-200"
+              >
+                {copied ? t('auth.copied') : t('auth.copySecret')}
+              </button>
+              <button
+                onClick={() => void confirmMnemonic()}
+                disabled={busy}
+                className="rounded-md bg-coffee-600 px-4 py-2.5 font-medium text-coffee-50 disabled:opacity-50"
+              >
+                {busy ? t('auth.working') : t('auth.savedContinue')}
+              </button>
+            </div>
+          </>
+        )}
+        {error && <p className="text-sm text-red-400">{error.message}</p>}
       </main>
     );
   }
