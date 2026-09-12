@@ -1,6 +1,6 @@
 import type { Messages } from './i18n/messages';
 
-export const GAME_KEYS = ['spin', 'tap', 'clock'] as const;
+export const GAME_KEYS = ['spin', 'tap', 'clock', 'blackjack'] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export function isGameKey(value: string): value is GameKey {
@@ -32,7 +32,9 @@ export type ClockSettings = CommonSettings & {
   toleranceMs: number;
 };
 
-export type GameSettings = SpinSettings | TapSettings | ClockSettings;
+export type BlackjackSettings = CommonSettings;
+
+export type GameSettings = SpinSettings | TapSettings | ClockSettings | BlackjackSettings;
 
 export type SpinParams = {
   game: 'spin';
@@ -55,7 +57,28 @@ export type ClockParams = {
   startedAtMs: number;
 };
 
-export type GameParams = SpinParams | TapParams | ClockParams;
+export const BLACKJACK_SUITS = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
+export type BlackjackSuit = (typeof BLACKJACK_SUITS)[number];
+
+export const BLACKJACK_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as const;
+export type BlackjackRank = (typeof BLACKJACK_RANKS)[number];
+
+export type BlackjackCard = { suit: BlackjackSuit; rank: BlackjackRank };
+
+export type BlackjackAction = 'hit' | 'stand';
+
+export type BlackjackVisibleState = {
+  phase: 'player_turn' | 'settled';
+  playerCards: BlackjackCard[];
+  dealerCards: BlackjackCard[];
+  playerTotal: number;
+  dealerTotal: number | null;
+  outcome: 'won' | 'lost' | null;
+};
+
+export type BlackjackParams = BlackjackVisibleState & { game: 'blackjack' };
+
+export type GameParams = SpinParams | TapParams | ClockParams | BlackjackParams;
 
 export type SpinPerformance = { ack: true };
 
@@ -91,6 +114,7 @@ export const defaultSettings: Record<GameKey, GameSettings> = {
   spin: { ...commonDefaults, segments: 8, winSegments: 1 },
   tap: { ...commonDefaults, durationSeconds: 15, targetTaps: 30 },
   clock: { ...commonDefaults, targetSeconds: 10, toleranceMs: 100 },
+  blackjack: { ...commonDefaults, completionWindowSeconds: 180 },
 };
 
 export const settingsFields: Record<GameKey, SettingField[]> = {
@@ -121,12 +145,20 @@ export const settingsFields: Record<GameKey, SettingField[]> = {
     { key: 'targetSeconds', type: 'number', labelKey: 'games.fields.targetSeconds', min: 3, max: 60, step: 0.1, unitKey: 'games.units.seconds' },
     { key: 'toleranceMs', type: 'number', labelKey: 'games.fields.toleranceMs', min: 10, max: 1000, unitKey: 'games.units.ms' },
   ],
+  blackjack: [
+    { key: 'enabled', type: 'toggle', labelKey: 'games.fields.enabled' },
+    { key: 'paidPlayFee', type: 'tak', labelKey: 'games.fields.paidPlayFee' },
+    { key: 'maxPaidPlaysPerDay', type: 'number', labelKey: 'games.fields.maxPaidPlaysPerDay', min: 0, max: 10000 },
+    { key: 'prizeTak', type: 'tak', labelKey: 'games.fields.prizeTak' },
+    { key: 'completionWindowSeconds', type: 'number', labelKey: 'games.fields.completionWindowSeconds', min: 10, max: 600, unitKey: 'games.units.seconds' },
+  ],
 };
 
 export const GAMES: GameDescriptor[] = [
   { key: 'spin', titleKey: 'games.spin.title', descriptionKey: 'games.spin.description', settingsFields: settingsFields.spin },
   { key: 'tap', titleKey: 'games.tap.title', descriptionKey: 'games.tap.description', settingsFields: settingsFields.tap },
   { key: 'clock', titleKey: 'games.clock.title', descriptionKey: 'games.clock.description', settingsFields: settingsFields.clock },
+  { key: 'blackjack', titleKey: 'games.blackjack.title', descriptionKey: 'games.blackjack.description', settingsFields: settingsFields.blackjack },
 ];
 
 export function getGameDescriptor(gameKey: GameKey): GameDescriptor {
@@ -162,6 +194,8 @@ export function settle(
       const score = Math.abs(elapsed - p.targetMs);
       return { outcome: score <= p.toleranceMs ? 'won' : 'lost', score };
     }
+    case 'blackjack':
+      throw new Error('blackjack is settled via the games.blackjack.action state machine');
   }
 }
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { finishGame, getGameHistory, listGames, startGame, withGameErrors } from '../../games/service';
+import { blackjackAction, finishGame, getGameHistory, listGames, startGame, withGameErrors } from '../../games/service';
 import { protectedProcedure, router } from '../trpc';
 
 export const gamesRouter = router({
@@ -36,4 +36,18 @@ export const gamesRouter = router({
     .query(({ ctx, input }) =>
       withGameErrors(() => getGameHistory(ctx.db, ctx.user.id, input.limit ?? 20)),
     ),
+
+  blackjack: router({
+    action: protectedProcedure
+      .input(z.object({ playId: z.number().int().positive(), action: z.enum(['hit', 'stand']) }))
+      .mutation(({ ctx, input }) =>
+        withGameErrors(() =>
+          blackjackAction(ctx.db, ctx.env, {
+            userId: ctx.user.id,
+            playId: input.playId,
+            action: input.action,
+          }),
+        ),
+      ),
+  }),
 });

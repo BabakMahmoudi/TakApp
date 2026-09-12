@@ -9,6 +9,7 @@ import { ATTEMPT_TIMEOUT_MS, useStellarWorker, useWallet, withTimeout } from '..
 import { SpinWheel } from './spin-wheel';
 import { StopClock } from './stop-clock';
 import { TapBean } from './tap-bean';
+import { BlackjackTable } from './blackjack-table';
 
 type Phase = 'idle' | 'paying' | 'starting' | 'playing' | 'settling' | 'result';
 
@@ -146,6 +147,24 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
     [active, finish, t, utils, refetchBalances],
   );
 
+  const handleSettled = useCallback(
+    (result: FinishResult) => {
+      setResult(result);
+      setPhase('result');
+      void utils.games.list.invalidate();
+      void refetchBalances();
+    },
+    [utils, refetchBalances],
+  );
+
+  const handleBlackjackError = useCallback(
+    (err: unknown) => {
+      setError(t(gameErrorKey(typedCode(err))));
+      setPhase('idle');
+    },
+    [t],
+  );
+
   if (list.isPending) {
     return <p className="opacity-60">{t('games.loading')}</p>;
   }
@@ -200,6 +219,13 @@ export function GameShell({ gameKey }: { gameKey: GameKey }) {
           <SpinWheel params={active.params} onFinish={handleFinish} />
         ) : active.params.game === 'tap' ? (
           <TapBean params={active.params} onFinish={handleFinish} />
+        ) : active.params.game === 'blackjack' ? (
+          <BlackjackTable
+            playId={active.playId}
+            params={active.params}
+            onSettled={handleSettled}
+            onError={handleBlackjackError}
+          />
         ) : (
           <StopClock params={active.params} onFinish={handleFinish} />
         )}

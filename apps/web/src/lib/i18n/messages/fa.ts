@@ -283,6 +283,16 @@ const fa: Messages = {
   'games.clock.stop': 'توقف',
   'games.clock.tolerance': 'تلورانس',
 
+  'games.blackjack.title': 'بلک\u200cجک',
+  'games.blackjack.description': 'بدون رد شدن از ۲۱، از دیلر جلو بزنید.',
+  'games.blackjack.dealer': 'دیلر',
+  'games.blackjack.player': 'شما',
+  'games.blackjack.hit': 'برگ بکش',
+  'games.blackjack.stand': 'بایست',
+  'games.blackjack.blackjack': 'بلک\u200cجک!',
+  'games.blackjack.bust': 'باخت!',
+  'games.blackjack.push': 'مساوی — باختید',
+
   'games.errors.invalidGame': 'بازی ناشناخته',
   'games.errors.disabled': 'این بازی غیرفعال است',
   'games.errors.accountNotReady': 'حساب بازی آماده نیست',

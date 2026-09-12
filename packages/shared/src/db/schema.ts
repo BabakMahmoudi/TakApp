@@ -202,6 +202,7 @@ export const gamePlays = sqliteTable(
     playType: text('play_type').notNull().default('free'),
     status: text('status').notNull(),
     params: text('params').notNull(),
+    hiddenState: text('hidden_state'),
     performance: text('performance'),
     score: integer('score'),
     prize: text('prize'),

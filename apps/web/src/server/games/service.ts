@@ -16,6 +16,8 @@ import {
   getGameDescriptor,
   isGameKey,
   settle,
+  type BlackjackAction,
+  type BlackjackParams,
   type ClockSettings,
   type GameKey,
   type GameParams,
@@ -24,6 +26,16 @@ import {
   type SpinSettings,
   type TapSettings,
 } from '../../lib/games';
+import {
+  applyHit,
+  applyStand,
+  blackjackOutcome,
+  deal,
+  isBust,
+  newShoe,
+  visibleState,
+  type BlackjackHiddenState,
+} from './blackjack';
 import type { TrpcContext } from '../trpc/context';
 import type { WorkerEnv } from '../trpc/env';
 
@@ -139,10 +151,13 @@ const clockSettingsSchema = commonSettingsSchema.extend({
   toleranceMs: z.number().int().min(10).max(1000),
 });
 
+const blackjackSettingsSchema = commonSettingsSchema;
+
 export const settingsSchemaByGame: Record<GameKey, z.ZodType<GameSettings>> = {
   spin: spinSettingsSchema,
   tap: tapSettingsSchema,
   clock: clockSettingsSchema,
+  blackjack: blackjackSettingsSchema,
 };
 
 const spinPerformanceSchema = z.object({ ack: z.literal(true) });
@@ -230,6 +245,8 @@ function createParams(gameKey: GameKey, settings: GameSettings): GameParams {
         startedAtMs: Date.now(),
       };
     }
+    case 'blackjack':
+      throw new GameError('blackjack uses a dedicated deal path', 'INTERNAL');
   }
 }
 
@@ -252,6 +269,8 @@ export function isValidPerformance(
       if (!parsed.success) return false;
       return parsed.data.elapsedMs <= completionWindowSeconds * 1000;
     }
+    case 'blackjack':
+      return false;
   }
 }
 
@@ -264,13 +283,18 @@ async function getUserPublicKey(db: Db, userId: number): Promise<string> {
 async function markPayoutFailed(
   db: Db,
   playId: number,
-  performance: GamePerformance,
+  performance: GamePerformance | null,
   score: number | null,
   now: Date,
 ): Promise<void> {
   await db
     .update(gamePlays)
-    .set({ status: 'payout_failed', performance: JSON.stringify(performance), score, settledAt: now })
+    .set({
+      status: 'payout_failed',
+      performance: performance ? JSON.stringify(performance) : null,
+      score,
+      settledAt: now,
+    })
     .where(eq(gamePlays.id, playId));
 }
 
@@ -310,6 +334,66 @@ async function storedResult(play: GamePlay): Promise<FinishResult> {
     outcome: play.status as FinishResult['outcome'],
     prize: play.status === 'won' ? (play.prize ?? '0') : '0',
     score: play.score,
+  };
+}
+
+async function payOutWin(
+  db: Db,
+  env: GamesEnv,
+  play: GamePlay,
+  userId: number,
+  prize: string,
+  performance: GamePerformance | null,
+  score: number | null,
+): Promise<FinishResult> {
+  const now = new Date();
+  const casinoPublicKey = getCasinoKeypair(env).publicKey();
+  let casinoBalance: string;
+  try {
+    casinoBalance = await readCasinoTakBalance(env, casinoPublicKey);
+  } catch {
+    await markPayoutFailed(db, play.id, performance, score, now);
+    throw new GameError('Casino cannot cover the payout', 'PAYOUT_FAILED');
+  }
+  if (compareStroops(casinoBalance, prize) < 0) {
+    await markPayoutFailed(db, play.id, performance, score, now);
+    throw new GameError('Casino cannot cover the payout', 'PAYOUT_FAILED');
+  }
+
+  const winnerPublicKey = await getUserPublicKey(db, userId);
+  let payout: { txHash: string; envelopeXdr: string };
+  try {
+    payout = await submitTakTransfer({
+      networkPassphrase: env.NETWORK_PASSPHRASE,
+      sourceSecret: env.GAME_ACCOUNT_SECRET,
+      destination: winnerPublicKey,
+      amountStroops: prize,
+      takContractId: env.TAK_CONTRACT_ID,
+      horizonUrl: env.HORIZON_URL,
+      sorobanRpcUrl: env.SOROBAN_RPC_URL,
+    });
+  } catch {
+    await markPayoutFailed(db, play.id, performance, score, now);
+    throw new GameError('Payout failed', 'PAYOUT_FAILED');
+  }
+
+  await db
+    .update(gamePlays)
+    .set({
+      status: 'won',
+      performance: performance ? JSON.stringify(performance) : null,
+      score,
+      payoutTxHash: payout.txHash,
+      settledAt: now,
+    })
+    .where(eq(gamePlays.id, play.id));
+  await insertPayoutPayment(db, userId, winnerPublicKey, prize, payout.txHash, now);
+
+  return {
+    playId: play.id,
+    outcome: 'won',
+    prize,
+    score,
   };
 }
 
@@ -379,7 +463,17 @@ export async function startGame(
     throw new GameError('This payment was already used', 'FEE_ALREADY_USED');
   }
 
-  const params = createParams(gameKey, settings);
+  let params: GameParams;
+  let hiddenState: string | null = null;
+  if (gameKey === 'blackjack') {
+    const hidden = deal(newShoe());
+    const visible = visibleState(hidden, { settled: false, outcome: null });
+    params = { game: 'blackjack', ...visible };
+    hiddenState = JSON.stringify(hidden);
+  } else {
+    params = createParams(gameKey, settings);
+  }
+
   const [play] = await db
     .insert(gamePlays)
     .values({
@@ -388,6 +482,7 @@ export async function startGame(
       playType: 'paid',
       status: 'pending',
       params: JSON.stringify(params),
+      hiddenState,
       prize: settings.prizeTak,
       startedAt: now,
       createdAt: now,
@@ -427,6 +522,9 @@ export async function finishGame(
     throw new GameError('Unknown game', 'INVALID_GAME');
   }
   const gameKey = play.gameKey;
+  if (gameKey === 'blackjack') {
+    throw new GameError('Blackjack is settled via the action state machine', 'INVALID_GAME');
+  }
   const settings = await getSettings(db, gameKey);
   const params = safeJson(play.params) as GameParams | null;
   if (!params) {
@@ -471,54 +569,139 @@ export async function finishGame(
   }
 
   const prize = play.prize ?? settings.prizeTak;
-  const casinoPublicKey = getCasinoKeypair(env).publicKey();
-  let casinoBalance: string;
-  try {
-    casinoBalance = await readCasinoTakBalance(env, casinoPublicKey);
-  } catch {
-    await markPayoutFailed(db, play.id, performance, result.score, now);
-    throw new GameError('Casino cannot cover the payout', 'PAYOUT_FAILED');
+  return payOutWin(db, env, play, input.userId, prize, performance, result.score);
+}
+
+export type BlackjackActionResponse = {
+  playId: number;
+  phase: 'player_turn' | 'settled';
+  params: BlackjackParams;
+  result: FinishResult | null;
+};
+
+function parseHiddenState(text: string | null): BlackjackHiddenState | null {
+  if (!text) return null;
+  const raw = safeJson(text);
+  if (raw == null || typeof raw !== 'object') return null;
+  const state = raw as { deck?: unknown; playerCards?: unknown; dealerCards?: unknown };
+  if (!Array.isArray(state.deck) || !Array.isArray(state.playerCards) || !Array.isArray(state.dealerCards)) {
+    return null;
   }
-  if (compareStroops(casinoBalance, prize) < 0) {
-    await markPayoutFailed(db, play.id, performance, result.score, now);
-    throw new GameError('Casino cannot cover the payout', 'PAYOUT_FAILED');
+  return state as unknown as BlackjackHiddenState;
+}
+
+function blackjackParams(hidden: BlackjackHiddenState, settled: boolean, outcome: 'won' | 'lost' | null): BlackjackParams {
+  return { game: 'blackjack', ...visibleState(hidden, { settled, outcome }) };
+}
+
+export async function blackjackAction(
+  db: Db,
+  env: GamesEnv,
+  input: { userId: number; playId: number; action: BlackjackAction },
+): Promise<BlackjackActionResponse> {
+  const plays = await db
+    .select()
+    .from(gamePlays)
+    .where(and(eq(gamePlays.id, input.playId), eq(gamePlays.userId, input.userId)))
+    .limit(1);
+  const play = plays[0];
+  if (!play) {
+    throw new GameError('Play not found', 'PLAY_NOT_FOUND');
+  }
+  if (play.gameKey !== 'blackjack') {
+    throw new GameError('Play is not blackjack', 'INVALID_GAME');
   }
 
-  const winnerPublicKey = await getUserPublicKey(db, input.userId);
-  let payout: { txHash: string; envelopeXdr: string };
-  try {
-    payout = await submitTakTransfer({
-      networkPassphrase: env.NETWORK_PASSPHRASE,
-      sourceSecret: env.GAME_ACCOUNT_SECRET,
-      destination: winnerPublicKey,
-      amountStroops: prize,
-      takContractId: env.TAK_CONTRACT_ID,
-      horizonUrl: env.HORIZON_URL,
-      sorobanRpcUrl: env.SOROBAN_RPC_URL,
-    });
-  } catch {
-    await markPayoutFailed(db, play.id, performance, result.score, now);
-    throw new GameError('Payout failed', 'PAYOUT_FAILED');
+  if (play.status !== 'pending') {
+    const params = safeJson(play.params) as BlackjackParams | null;
+    if (!params || params.game !== 'blackjack') {
+      throw new GameError('Play parameters are corrupt', 'INTERNAL');
+    }
+    return { playId: play.id, phase: 'settled', params, result: await storedResult(play) };
   }
 
+  const settings = await getSettings(db, 'blackjack');
+  const hidden = parseHiddenState(play.hiddenState);
+  if (!hidden) {
+    throw new GameError('Play state is corrupt', 'INTERNAL');
+  }
+
+  const now = new Date();
+  if (play.startedAt.getTime() + settings.completionWindowSeconds * 1000 < Date.now()) {
+    const params = blackjackParams(hidden, true, null);
+    await db
+      .update(gamePlays)
+      .set({ status: 'abandoned', params: JSON.stringify(params), settledAt: now })
+      .where(eq(gamePlays.id, play.id));
+    return {
+      playId: play.id,
+      phase: 'settled',
+      params,
+      result: { playId: play.id, outcome: 'abandoned', prize: '0', score: null },
+    };
+  }
+
+  if (input.action === 'hit') {
+    const next = applyHit(hidden);
+    if (isBust(next.playerCards)) {
+      const params = blackjackParams(next, true, 'lost');
+      await db
+        .update(gamePlays)
+        .set({
+          status: 'lost',
+          params: JSON.stringify(params),
+          hiddenState: JSON.stringify(next),
+          score: null,
+          settledAt: now,
+        })
+        .where(eq(gamePlays.id, play.id));
+      return {
+        playId: play.id,
+        phase: 'settled',
+        params,
+        result: { playId: play.id, outcome: 'lost', prize: '0', score: null },
+      };
+    }
+
+    const params = blackjackParams(next, false, null);
+    await db
+      .update(gamePlays)
+      .set({ params: JSON.stringify(params), hiddenState: JSON.stringify(next) })
+      .where(eq(gamePlays.id, play.id));
+    return { playId: play.id, phase: 'player_turn', params, result: null };
+  }
+
+  const next = applyStand(hidden);
+  const outcome = blackjackOutcome(next.playerCards, next.dealerCards);
+  const resolved: 'won' | 'lost' = outcome === 'win' ? 'won' : 'lost';
+  const params = blackjackParams(next, true, resolved);
+
+  if (resolved === 'lost') {
+    await db
+      .update(gamePlays)
+      .set({
+        status: 'lost',
+        params: JSON.stringify(params),
+        hiddenState: JSON.stringify(next),
+        score: null,
+        settledAt: now,
+      })
+      .where(eq(gamePlays.id, play.id));
+    return {
+      playId: play.id,
+      phase: 'settled',
+      params,
+      result: { playId: play.id, outcome: 'lost', prize: '0', score: null },
+    };
+  }
+
+  const prize = play.prize ?? settings.prizeTak;
   await db
     .update(gamePlays)
-    .set({
-      status: 'won',
-      performance: JSON.stringify(performance),
-      score: result.score,
-      payoutTxHash: payout.txHash,
-      settledAt: now,
-    })
+    .set({ params: JSON.stringify(params), hiddenState: JSON.stringify(next), score: null })
     .where(eq(gamePlays.id, play.id));
-  await insertPayoutPayment(db, input.userId, winnerPublicKey, prize, payout.txHash, now);
-
-  return {
-    playId: play.id,
-    outcome: 'won',
-    prize,
-    score: result.score,
-  };
+  const result = await payOutWin(db, env, play, input.userId, prize, null, null);
+  return { playId: play.id, phase: 'settled', params, result };
 }
 
 export async function getGameHistory(db: Db, userId: number, limit = 20) {

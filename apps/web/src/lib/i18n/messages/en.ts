@@ -281,6 +281,16 @@ const en = {
   'games.clock.stop': 'Stop',
   'games.clock.tolerance': 'Tolerance',
 
+  'games.blackjack.title': 'Blackjack',
+  'games.blackjack.description': 'Beat the dealer to 21 without going bust.',
+  'games.blackjack.dealer': 'Dealer',
+  'games.blackjack.player': 'Player',
+  'games.blackjack.hit': 'Hit',
+  'games.blackjack.stand': 'Stand',
+  'games.blackjack.blackjack': 'Blackjack!',
+  'games.blackjack.bust': 'Bust!',
+  'games.blackjack.push': 'Push — you lose',
+
   'games.errors.invalidGame': 'Unknown game',
   'games.errors.disabled': 'This game is disabled',
   'games.errors.accountNotReady': 'The game account is not ready',

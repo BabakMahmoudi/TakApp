@@ -399,6 +399,21 @@ describe('finishGame', () => {
     expect(submitTakTransfer).toHaveBeenCalledOnce();
     expect(db.table('payments').rows).toHaveLength(1);
   });
+
+  it('rejects a blackjack play (must use games.blackjack.action)', async () => {
+    const db = makeDb({
+      gamePlays: [
+        pendingSpinPlay({
+          gameKey: 'blackjack',
+          params: JSON.stringify({ game: 'blackjack', phase: 'player_turn', playerCards: [], dealerCards: [], playerTotal: 0, dealerTotal: null, outcome: null }),
+        }),
+      ],
+    });
+    const code = await gameErrorCode(
+      finishGame(asDb(db), makeEnv(), { userId: USER_ID, playId: 1, performance: { ack: true } }),
+    );
+    expect(code).toBe('INVALID_GAME');
+  });
 });
 
 describe('retryPayoutForAdmin', () => {

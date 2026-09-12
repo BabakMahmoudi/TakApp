@@ -1,0 +1,1 @@
+ALTER TABLE `game_plays` ADD `hidden_state` text;
